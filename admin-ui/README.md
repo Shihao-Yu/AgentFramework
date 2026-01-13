@@ -203,6 +203,31 @@ See [docs/API_INTEGRATION.md](docs/API_INTEGRATION.md) for:
 - Integration examples with TanStack Query
 - Environment configuration
 
+## Examples
+
+See the [examples/](examples/) directory for complete working examples:
+
+| Example | Framework | Description |
+|---------|-----------|-------------|
+| [vanilla-html](examples/vanilla-html/) | None | Pure HTML/JS, no build step |
+| [react-host](examples/react-host/) | React 18 | React app with TypeScript |
+| [angular-host](examples/angular-host/) | Angular 17 | Angular standalone component |
+
+Quick start:
+```bash
+# Build the widget first
+npm run build:wc
+
+# Run vanilla example (no install needed)
+open examples/vanilla-html/index.html
+
+# Or run React example
+cd examples/react-host && npm install && npm run dev
+
+# Or run Angular example
+cd examples/angular-host && npm install && npm start
+```
+
 ## Development
 
 ```bash

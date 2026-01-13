@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin UI Widget - Vanilla HTML Example</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f0f0f0;
+    }
+
+    .app-header {
+      background: #1a1a2e;
+      color: white;
+      padding: 16px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .app-header h1 {
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .header-actions select {
+      padding: 6px 12px;
+      border-radius: 4px;
+      border: none;
+      background: #2a2a4e;
+      color: white;
+    }
+
+    .header-actions button {
+      padding: 6px 16px;
+      border-radius: 4px;
+      border: none;
+      background: #3b82f6;
+      color: white;
+      cursor: pointer;
+    }
+
+    .header-actions button:hover {
+      background: #2563eb;
+    }
+
+    .widget-wrapper {
+      height: calc(100vh - 56px);
+    }
+
+    admin-ui-widget {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #1a1a2e;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      transform: translateY(100px);
+      opacity: 0;
+      transition: all 0.3s ease;
+      z-index: 10000;
+    }
+
+    .toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    .toast-title {
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .toast-message {
+      font-size: 14px;
+      opacity: 0.8;
+    }
+  </style>
+</head>
+<body>
+  <header class="app-header">
+    <h1>My Application (Host App)</h1>
+    <div class="header-actions">
+      <select id="themeSelect" onchange="changeTheme(this.value)">
+        <option value="system">System Theme</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+      </select>
+      <button onclick="navigateTo('/')">FAQs</button>
+      <button onclick="navigateTo('/graph')">Graph</button>
+      <button onclick="navigateTo('/analytics')">Analytics</button>
+    </div>
+  </header>
+
+  <div class="widget-wrapper">
+    <admin-ui-widget
+      id="adminWidget"
+      api-base-url="http://localhost:8000"
+      tenant-id="demo-tenant"
+      initial-route="/"
+      theme="system"
+    ></admin-ui-widget>
+  </div>
+
+  <div id="toast" class="toast">
+    <div class="toast-title"></div>
+    <div class="toast-message"></div>
+  </div>
+
+  <script src="../../dist-wc/admin-ui-widget.umd.js"></script>
+  <script>
+    const widget = document.getElementById('adminWidget');
+    const toast = document.getElementById('toast');
+
+    widget.addEventListener('ready', () => {
+      showToast('Widget Ready', 'Admin UI has been initialized');
+    });
+
+    widget.addEventListener('faq-created', (e) => {
+      showToast('FAQ Created', `New FAQ: ${e.detail.title}`);
+    });
+
+    widget.addEventListener('faq-updated', (e) => {
+      showToast('FAQ Updated', `Updated: ${e.detail.title}`);
+    });
+
+    widget.addEventListener('faq-deleted', (e) => {
+      showToast('FAQ Deleted', `Deleted FAQ #${e.detail.id}`);
+    });
+
+    widget.addEventListener('node-selected', (e) => {
+      if (e.detail) {
+        showToast('Node Selected', `Type: ${e.detail.type}, ID: ${e.detail.id}`);
+      }
+    });
+
+    widget.addEventListener('error', (e) => {
+      showToast('Error', e.detail.message);
+    });
+
+    function navigateTo(path) {
+      widget.setAttribute('initial-route', path);
+      widget.refresh();
+    }
+
+    function changeTheme(theme) {
+      widget.setTheme(theme);
+    }
+
+    function showToast(title, message) {
+      toast.querySelector('.toast-title').textContent = title;
+      toast.querySelector('.toast-message').textContent = message;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 3000);
+    }
+  </script>
+</body>
+</html>

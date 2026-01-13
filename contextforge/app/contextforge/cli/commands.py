@@ -411,6 +411,113 @@ def status(ctx):
     run_async(_status())
 
 
+@cli.command("test-retrieval")
+@click.argument("dataset_name")
+@click.argument("question")
+@click.option("--top-k", "-k", default=10, help="Number of results to return")
+@click.option("--strategy", "-s", type=click.Choice(["concept", "field", "hybrid", "fusion"]), default="fusion", help="Retrieval strategy")
+@click.option("--show-scores", is_flag=True, help="Show relevance scores")
+@click.option("--show-examples", is_flag=True, help="Also retrieve matching examples")
+@click.pass_context
+def test_retrieval(ctx, dataset_name: str, question: str, top_k: int, strategy: str, show_scores: bool, show_examples: bool):
+    """
+    Test retrieval pipeline for a question.
+    
+    Shows what fields and examples would be retrieved for a given question,
+    without generating a query. Useful for debugging and tuning.
+    
+    Example:
+    
+        contextforge test-retrieval mydb "Show orders from last week" --show-scores
+        
+        contextforge test-retrieval mydb "Find active users" -k 5 --show-examples
+    """
+    click.echo(f"Testing retrieval for: {question}")
+    click.echo(f"Dataset: {dataset_name}, Strategy: {strategy}, Top-K: {top_k}")
+    click.echo("=" * 60)
+    
+    async def _test_retrieval():
+        from app.database import get_async_session
+        from app.clients import get_embedding_client
+        from ..retrieval import GraphContextRetriever, RetrievalStrategy
+        from ..graph import SchemaGraph
+        from ..storage import PostgresSchemaStore
+        
+        tenant_id = ctx.obj["tenant_id"]
+        
+        async with get_async_session() as session:
+            store = PostgresSchemaStore(tenant_id=tenant_id)
+            
+            fields = await store.get_fields(session, dataset_name)
+            
+            if not fields:
+                click.echo(f"No schema fields found for dataset '{dataset_name}'", err=True)
+                click.echo("Run 'contextforge onboard' first to import a schema.", err=True)
+                return
+            
+            click.echo(f"Loaded {len(fields)} fields from schema\n")
+            
+            graph = SchemaGraph()
+            for field in fields:
+                graph.add_field(field)
+            
+            strategy_enum = RetrievalStrategy(strategy)
+            retriever = GraphContextRetriever(
+                graph=graph,
+                strategy=strategy_enum,
+            )
+            
+            context = retriever.retrieve(question, top_k=top_k)
+            
+            click.echo("RETRIEVED FIELDS")
+            click.echo("-" * 40)
+            
+            if not context.fields:
+                click.echo("  (no fields matched)")
+            else:
+                for i, field in enumerate(context.fields, 1):
+                    score_str = ""
+                    if show_scores and context.field_scores:
+                        score = context.field_scores.get(field.name, 0)
+                        score_str = f" [score: {score:.3f}]"
+                    
+                    click.echo(f"  {i}. {field.name}{score_str}")
+                    click.echo(f"     Type: {field.data_type}")
+                    if field.description:
+                        desc = field.description[:60] + "..." if len(field.description) > 60 else field.description
+                        click.echo(f"     Desc: {desc}")
+            
+            if context.expanded_fields:
+                click.echo(f"\nEXPANDED FIELDS (via graph traversal)")
+                click.echo("-" * 40)
+                for i, field in enumerate(context.expanded_fields, 1):
+                    click.echo(f"  {i}. {field.name} ({field.data_type})")
+            
+            if show_examples:
+                click.echo(f"\nMATCHING EXAMPLES")
+                click.echo("-" * 40)
+                
+                if context.examples:
+                    for i, ex in enumerate(context.examples, 1):
+                        q = ex.question[:50] + "..." if len(ex.question) > 50 else ex.question
+                        click.echo(f"  {i}. Q: {q}")
+                        query_preview = ex.query[:60] + "..." if len(ex.query) > 60 else ex.query
+                        click.echo(f"     A: {query_preview}")
+                else:
+                    click.echo("  (no examples matched)")
+            
+            click.echo(f"\nSTATISTICS")
+            click.echo("-" * 40)
+            click.echo(f"  Fields retrieved: {len(context.fields)}")
+            click.echo(f"  Fields expanded: {len(context.expanded_fields)}")
+            click.echo(f"  Examples matched: {len(context.examples)}")
+            if context.expansion_stats:
+                click.echo(f"  Concepts matched: {context.expansion_stats.get('concept_count', 0)}")
+                click.echo(f"  Keywords extracted: {context.expansion_stats.get('keyword_count', 0)}")
+    
+    run_async(_test_retrieval())
+
+
 def main():
     """CLI entry point."""
     cli(obj={})
