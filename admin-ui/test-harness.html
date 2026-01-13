@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin UI Widget - Test Harness</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #f5f5f5;
+      padding: 20px;
+    }
+    
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    
+    h1 {
+      margin-bottom: 20px;
+      color: #333;
+    }
+    
+    .controls {
+      background: white;
+      padding: 16px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    .controls h2 {
+      font-size: 14px;
+      margin-bottom: 12px;
+      color: #666;
+    }
+    
+    .control-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    
+    .control-group label {
+      font-size: 12px;
+      color: #666;
+    }
+    
+    .control-group input,
+    .control-group select {
+      padding: 8px 12px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    
+    .control-group input {
+      width: 200px;
+    }
+    
+    button {
+      padding: 8px 16px;
+      background: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    
+    button:hover {
+      background: #2563eb;
+    }
+    
+    .widget-container {
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      overflow: hidden;
+      height: calc(100vh - 200px);
+      min-height: 600px;
+    }
+    
+    admin-ui-widget {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    
+    .events-log {
+      background: white;
+      padding: 16px;
+      border-radius: 8px;
+      margin-top: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    .events-log h2 {
+      font-size: 14px;
+      margin-bottom: 12px;
+      color: #666;
+    }
+    
+    .events-list {
+      font-family: monospace;
+      font-size: 12px;
+      max-height: 150px;
+      overflow-y: auto;
+      background: #f9f9f9;
+      padding: 8px;
+      border-radius: 4px;
+    }
+    
+    .event-item {
+      padding: 4px 0;
+      border-bottom: 1px solid #eee;
+    }
+    
+    .event-item:last-child {
+      border-bottom: none;
+    }
+    
+    .event-type {
+      color: #3b82f6;
+      font-weight: bold;
+    }
+    
+    .event-time {
+      color: #999;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Admin UI Widget - Test Harness</h1>
+    
+    <div class="controls">
+      <h2>Configuration</h2>
+      <div class="control-row">
+        <div class="control-group">
+          <label>API Base URL</label>
+          <input type="text" id="apiUrl" value="http://localhost:8000" />
+        </div>
+        <div class="control-group">
+          <label>Tenant ID</label>
+          <input type="text" id="tenantId" value="purchasing" />
+        </div>
+        <div class="control-group">
+          <label>Initial Route</label>
+          <select id="initialRoute">
+            <option value="/">FAQ</option>
+            <option value="/graph">Graph Explorer</option>
+            <option value="/permissions">Permissions</option>
+            <option value="/schemas">Schemas</option>
+            <option value="/playbooks">Playbooks</option>
+            <option value="/entities">Entities</option>
+            <option value="/concepts">Concepts</option>
+            <option value="/staging">Staging</option>
+            <option value="/analytics">Analytics</option>
+            <option value="/settings">Settings</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <label>Theme</label>
+          <select id="theme">
+            <option value="system">System</option>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+        </div>
+        <button onclick="applyConfig()">Apply</button>
+        <button onclick="clearEvents()">Clear Events</button>
+      </div>
+    </div>
+    
+    <div class="widget-container">
+      <admin-ui-widget
+        id="widget"
+        api-base-url="http://localhost:8000"
+        tenant-id="purchasing"
+        initial-route="/"
+        theme="system"
+      ></admin-ui-widget>
+    </div>
+    
+    <div class="events-log">
+      <h2>Events Log</h2>
+      <div class="events-list" id="eventsList">
+        <div class="event-item" style="color: #999;">Waiting for events...</div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./dist-wc/admin-ui-widget.es.js"></script>
+  <script>
+    const widget = document.getElementById('widget');
+    const eventsList = document.getElementById('eventsList');
+    let eventsLogged = false;
+    
+    const eventTypes = [
+      'ready',
+      'config-changed',
+      'route-changed',
+      'navigate-request',
+      'faq-created',
+      'faq-updated',
+      'faq-deleted',
+      'node-selected',
+      'error'
+    ];
+    
+    eventTypes.forEach(eventType => {
+      widget.addEventListener(eventType, (e) => {
+        logEvent(eventType, e.detail);
+      });
+    });
+    
+    function logEvent(type, detail) {
+      if (!eventsLogged) {
+        eventsList.innerHTML = '';
+        eventsLogged = true;
+      }
+      
+      const time = new Date().toLocaleTimeString();
+      const item = document.createElement('div');
+      item.className = 'event-item';
+      item.innerHTML = `
+        <span class="event-time">[${time}]</span>
+        <span class="event-type">${type}</span>
+        <span>${JSON.stringify(detail)}</span>
+      `;
+      eventsList.insertBefore(item, eventsList.firstChild);
+    }
+    
+    function applyConfig() {
+      widget.setAttribute('api-base-url', document.getElementById('apiUrl').value);
+      widget.setAttribute('tenant-id', document.getElementById('tenantId').value);
+      widget.setAttribute('initial-route', document.getElementById('initialRoute').value);
+      widget.setAttribute('theme', document.getElementById('theme').value);
+    }
+    
+    function clearEvents() {
+      eventsList.innerHTML = '<div class="event-item" style="color: #999;">Waiting for events...</div>';
+      eventsLogged = false;
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg15
+    container_name: faq-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: faq_knowledge_base
+    ports:
+      - "5432:5432"
+    volumes:
+      - faq_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d faq_knowledge_base"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  faq_postgres_data:
