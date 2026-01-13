@@ -224,6 +224,9 @@ class NodeService:
         vector_weight: float = 0.6,
         limit: int = 20,
     ) -> List[NodeSearchResult]:
+        if not query_text or not query_text.strip():
+            return []
+        
         query_embedding = await self.embedding_client.embed(query_text)
         
         result = await self.session.execute(

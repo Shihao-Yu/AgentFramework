@@ -37,10 +37,10 @@ async def get_user_tenant_ids(
     tenant_service = TenantService(session)
     tenants = await tenant_service.get_user_tenants(user_id)
     if not tenants:
-        tenants = ["default", "shared"]
-    else:
-        if "shared" not in tenants:
-            tenants.append("shared")
+        all_tenants = await tenant_service.list_tenants()
+        tenants = [t.id for t in all_tenants]
+    if "shared" not in tenants:
+        tenants.append("shared")
     return tenants
 
 

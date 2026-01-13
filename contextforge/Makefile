@@ -70,6 +70,10 @@ shell:
 db-shell:
 	psql $(DATABASE_URL)
 
+seed:
+	@echo "Seeding test data..."
+	psql $(DATABASE_URL) < scripts/seed_test_data.sql
+
 clean:
 	rm -rf $(VENV)
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
@@ -100,6 +104,10 @@ help:
 	@echo "  make onboard TYPE=postgres CONN='postgresql://...' NAME=mydb"
 	@echo "  make generate DATASET=mydb Q='Show all users'"
 	@echo "  make test-retrieval DATASET=mydb Q='Show all users'"
+	@echo ""
+	@echo "Database:"
+	@echo "  make seed       - Seed database with test data"
+	@echo "  make db-shell   - Open psql to database"
 	@echo ""
 	@echo "Utilities:"
 	@echo "  make shell      - Python REPL with project context"

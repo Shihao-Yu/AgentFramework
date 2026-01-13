@@ -10,16 +10,16 @@ from app.models.enums import NodeType, EdgeType
 
 
 class ContextRequest(BaseModel):
-    query: str = Field(..., min_length=1)
-    tenant_ids: List[str] = Field(..., min_length=1)
+    query: str = Field(default="")
+    tenant_ids: List[str] = Field(default_factory=list)
     
     entry_types: Optional[List[NodeType]] = None
-    entry_limit: int = Field(default=3, ge=1, le=10)
+    entry_limit: int = Field(default=10, ge=1, le=100)
     
     expand: bool = True
     expansion_types: Optional[List[NodeType]] = None
-    max_depth: int = Field(default=2, ge=1, le=5)
-    context_limit: int = Field(default=10, ge=1, le=50)
+    max_depth: int = Field(default=2, ge=1, le=10)
+    context_limit: int = Field(default=50, ge=1, le=200)
     
     include_entities: bool = True
     include_schemas: bool = False

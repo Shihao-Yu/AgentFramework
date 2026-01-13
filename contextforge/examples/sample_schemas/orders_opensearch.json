@@ -1,0 +1,68 @@
+{
+  "orders-*": {
+    "mappings": {
+      "properties": {
+        "order_id": {
+          "type": "keyword"
+        },
+        "order_number": {
+          "type": "keyword"
+        },
+        "status": {
+          "type": "keyword"
+        },
+        "total_amount": {
+          "type": "float"
+        },
+        "currency": {
+          "type": "keyword"
+        },
+        "created_at": {
+          "type": "date"
+        },
+        "updated_at": {
+          "type": "date"
+        },
+        "customer": {
+          "type": "object",
+          "properties": {
+            "id": {"type": "keyword"},
+            "email": {"type": "keyword"},
+            "name": {"type": "text"},
+            "phone": {"type": "keyword"},
+            "tier": {"type": "keyword"}
+          }
+        },
+        "shipping": {
+          "type": "object",
+          "properties": {
+            "address": {"type": "text"},
+            "city": {"type": "keyword"},
+            "state": {"type": "keyword"},
+            "postal_code": {"type": "keyword"},
+            "country": {"type": "keyword"},
+            "method": {"type": "keyword"},
+            "tracking_number": {"type": "keyword"}
+          }
+        },
+        "items": {
+          "type": "nested",
+          "properties": {
+            "product_id": {"type": "keyword"},
+            "product_name": {"type": "text"},
+            "quantity": {"type": "integer"},
+            "unit_price": {"type": "float"},
+            "discount": {"type": "float"},
+            "category": {"type": "keyword"}
+          }
+        },
+        "notes": {
+          "type": "text"
+        },
+        "tags": {
+          "type": "keyword"
+        }
+      }
+    }
+  }
+}

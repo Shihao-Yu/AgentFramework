@@ -64,7 +64,7 @@ def onboard(
     click.echo(f"Onboarding {source_type} source: {name}")
     
     async def _onboard():
-        from app.database import get_async_session
+        from app.core.database import get_session_context as get_async_session
         
         tenant_id = ctx.obj["tenant_id"]
         
@@ -162,7 +162,7 @@ def train(
     click.echo(f"Adding training example for {dataset_name}")
     
     async def _train():
-        from app.database import get_async_session
+        from app.core.database import get_session_context as get_async_session
         from ..schema import ExampleSpec
         from ..storage import PostgresVectorAdapter
         
@@ -212,7 +212,7 @@ def validate_examples(ctx, dataset_name: str, limit: int, auto_fix: bool):
     click.echo(f"Validating examples for {dataset_name}")
     
     async def _validate():
-        from app.database import get_async_session
+        from app.core.database import get_session_context as get_async_session
         from ..storage import PostgresVectorAdapter
         
         tenant_id = ctx.obj["tenant_id"]
@@ -270,7 +270,7 @@ def export(ctx, dataset_name: str, output_path: str, fmt: str, include_examples:
     click.echo(f"Exporting {dataset_name} to {output_path}")
     
     async def _export():
-        from app.database import get_async_session
+        from app.core.database import get_session_context as get_async_session
         from ..storage import PostgresSchemaStore
         
         tenant_id = ctx.obj["tenant_id"]
@@ -314,7 +314,7 @@ def sync_prompts(ctx, direction: str, name: Optional[str]):
     click.echo(f"Syncing prompts ({direction})")
     
     async def _sync():
-        from app.database import get_async_session
+        from app.core.database import get_session_context as get_async_session
         from ..prompts import PostgresPromptStore, create_langfuse_sync
         
         tenant_id = ctx.obj["tenant_id"]
@@ -353,7 +353,7 @@ def generate(ctx, dataset_name: str, question: str, dialect: str, verbose: bool)
     click.echo(f"Generating query for: {question}")
     
     async def _generate():
-        from app.database import get_async_session
+        from app.core.database import get_session_context as get_async_session
         from app.clients import get_inference_client
         from ..generation import QueryGenerationPipeline
         from ..retrieval import GraphContextRetriever
@@ -391,7 +391,7 @@ def status(ctx):
     click.echo("=" * 40)
     
     async def _status():
-        from app.database import get_async_session
+        from app.core.database import get_session_context as get_async_session
         from sqlalchemy import select, func
         from app.models.nodes import KnowledgeNode
         from app.models.enums import NodeType
@@ -415,7 +415,7 @@ def status(ctx):
 @click.argument("dataset_name")
 @click.argument("question")
 @click.option("--top-k", "-k", default=10, help="Number of results to return")
-@click.option("--strategy", "-s", type=click.Choice(["concept", "field", "hybrid", "fusion"]), default="fusion", help="Retrieval strategy")
+@click.option("--strategy", "-s", type=click.Choice(["keyword", "hybrid", "vector"]), default="hybrid", help="Retrieval strategy (keyword=BM25 only, hybrid=BM25+Vector, vector=Vector only)")
 @click.option("--show-scores", is_flag=True, help="Show relevance scores")
 @click.option("--show-examples", is_flag=True, help="Also retrieve matching examples")
 @click.pass_context
@@ -426,94 +426,245 @@ def test_retrieval(ctx, dataset_name: str, question: str, top_k: int, strategy: 
     Shows what fields and examples would be retrieved for a given question,
     without generating a query. Useful for debugging and tuning.
     
+    Strategies:
+    - keyword: BM25 text search only (works without embeddings)
+    - hybrid: BM25 + Vector search combined (requires embeddings)
+    - vector: Vector similarity only (requires embeddings)
+    
     Example:
     
         contextforge test-retrieval mydb "Show orders from last week" --show-scores
         
-        contextforge test-retrieval mydb "Find active users" -k 5 --show-examples
+        contextforge test-retrieval mydb "Find active users" -k 5 --strategy keyword
+        
+        contextforge test-retrieval mydb "pending orders" --show-examples
     """
     click.echo(f"Testing retrieval for: {question}")
     click.echo(f"Dataset: {dataset_name}, Strategy: {strategy}, Top-K: {top_k}")
     click.echo("=" * 60)
     
     async def _test_retrieval():
-        from app.database import get_async_session
-        from app.clients import get_embedding_client
-        from ..retrieval import GraphContextRetriever, RetrievalStrategy
-        from ..graph import SchemaGraph
-        from ..storage import PostgresSchemaStore
+        from app.core.database import get_session_context as get_async_session
+        from app.core.dependencies import get_embedding_client_instance
+        from app.models.enums import NodeType
+        from sqlalchemy import text
         
         tenant_id = ctx.obj["tenant_id"]
         
         async with get_async_session() as session:
-            store = PostgresSchemaStore(tenant_id=tenant_id)
-            
-            fields = await store.get_fields(session, dataset_name)
+            # First check what nodes exist for this dataset
+            result = await session.execute(
+                text("""
+                    SELECT id, title, field_path, data_type, content, 
+                           embedding IS NOT NULL as has_embedding,
+                           search_vector IS NOT NULL as has_search_vector
+                    FROM agent.knowledge_nodes 
+                    WHERE tenant_id = :tenant_id
+                    AND dataset_name = :dataset_name
+                    AND node_type = 'schema_field'
+                    AND is_deleted = FALSE
+                    AND status = 'published'
+                """),
+                {"tenant_id": tenant_id, "dataset_name": dataset_name}
+            )
+            fields = result.fetchall()
             
             if not fields:
                 click.echo(f"No schema fields found for dataset '{dataset_name}'", err=True)
                 click.echo("Run 'contextforge onboard' first to import a schema.", err=True)
                 return
             
-            click.echo(f"Loaded {len(fields)} fields from schema\n")
+            # Check embedding availability
+            fields_with_embeddings = sum(1 for f in fields if f.has_embedding)
+            fields_with_search_vector = sum(1 for f in fields if f.has_search_vector)
             
-            graph = SchemaGraph()
-            for field in fields:
-                graph.add_field(field)
+            click.echo(f"Found {len(fields)} fields in schema")
+            click.echo(f"  - With embeddings: {fields_with_embeddings}")
+            click.echo(f"  - With search vectors: {fields_with_search_vector}")
             
-            strategy_enum = RetrievalStrategy(strategy)
-            retriever = GraphContextRetriever(
-                graph=graph,
-                strategy=strategy_enum,
-            )
+            # Auto-fallback to keyword if no embeddings
+            effective_strategy = strategy
+            if strategy in ("hybrid", "vector") and fields_with_embeddings == 0:
+                click.echo(f"\n[!] No embeddings available, falling back to keyword-only search")
+                effective_strategy = "keyword"
             
-            context = retriever.retrieve(question, top_k=top_k)
+            click.echo(f"\nUsing strategy: {effective_strategy}\n")
             
-            click.echo("RETRIEVED FIELDS")
-            click.echo("-" * 40)
-            
-            if not context.fields:
-                click.echo("  (no fields matched)")
-            else:
-                for i, field in enumerate(context.fields, 1):
-                    score_str = ""
-                    if show_scores and context.field_scores:
-                        score = context.field_scores.get(field.name, 0)
-                        score_str = f" [score: {score:.3f}]"
-                    
-                    click.echo(f"  {i}. {field.name}{score_str}")
-                    click.echo(f"     Type: {field.data_type}")
-                    if field.description:
-                        desc = field.description[:60] + "..." if len(field.description) > 60 else field.description
-                        click.echo(f"     Desc: {desc}")
-            
-            if context.expanded_fields:
-                click.echo(f"\nEXPANDED FIELDS (via graph traversal)")
+            # Execute search based on strategy
+            if effective_strategy == "keyword":
+                # BM25 keyword search only
+                result = await session.execute(
+                    text("""
+                        SELECT 
+                            n.id,
+                            n.title,
+                            n.field_path,
+                            n.data_type,
+                            n.content,
+                            ts_rank_cd(n.search_vector, plainto_tsquery('english', :query)) as bm25_score
+                        FROM agent.knowledge_nodes n
+                        WHERE n.tenant_id = :tenant_id
+                        AND n.dataset_name = :dataset_name
+                        AND n.node_type = 'schema_field'
+                        AND n.is_deleted = FALSE
+                        AND n.status = 'published'
+                        AND (
+                            n.search_vector @@ plainto_tsquery('english', :query)
+                            OR n.title ILIKE :like_query
+                            OR n.field_path ILIKE :like_query
+                            OR n.content::text ILIKE :like_query
+                        )
+                        ORDER BY bm25_score DESC NULLS LAST, n.title
+                        LIMIT :limit
+                    """),
+                    {
+                        "tenant_id": tenant_id,
+                        "dataset_name": dataset_name,
+                        "query": question,
+                        "like_query": f"%{question}%",
+                        "limit": top_k,
+                    }
+                )
+                rows = result.fetchall()
+                
+                click.echo("RETRIEVED FIELDS (Keyword/BM25 Search)")
                 click.echo("-" * 40)
-                for i, field in enumerate(context.expanded_fields, 1):
-                    click.echo(f"  {i}. {field.name} ({field.data_type})")
+                
+                if not rows:
+                    click.echo("  (no fields matched)")
+                else:
+                    for i, row in enumerate(rows, 1):
+                        field_name = row.field_path or row.title
+                        click.echo(f"  {i}. {field_name}")
+                        click.echo(f"     Type: {row.data_type or 'unknown'}")
+                        if show_scores:
+                            click.echo(f"     BM25 Score: {row.bm25_score or 0:.4f}")
+                        if row.content:
+                            desc = row.content.get("description", "")
+                            if desc:
+                                desc = desc[:60] + "..." if len(desc) > 60 else desc
+                                click.echo(f"     Desc: {desc}")
+                            biz = row.content.get("business_meaning", "")
+                            if biz:
+                                biz = biz[:60] + "..." if len(biz) > 60 else biz
+                                click.echo(f"     Business: {biz}")
+                
+            else:
+                # Hybrid or Vector search using hybrid_search_nodes function
+                embedding_client = get_embedding_client_instance()
+                query_embedding = await embedding_client.embed(question)
+                
+                # Set weights based on strategy
+                if effective_strategy == "vector":
+                    bm25_weight, vector_weight = 0.0, 1.0
+                else:  # hybrid
+                    bm25_weight, vector_weight = 0.4, 0.6
+                
+                result = await session.execute(
+                    text("""
+                        SELECT * FROM agent.hybrid_search_nodes(
+                            :query_text,
+                            :query_embedding,
+                            :tenant_ids,
+                            :node_types,
+                            NULL,
+                            :bm25_weight,
+                            :vector_weight,
+                            :result_limit
+                        )
+                        WHERE dataset_name = :dataset_name
+                    """),
+                    {
+                        "query_text": question,
+                        "query_embedding": query_embedding,
+                        "tenant_ids": [tenant_id],
+                        "node_types": [NodeType.SCHEMA_FIELD.value],
+                        "bm25_weight": bm25_weight,
+                        "vector_weight": vector_weight,
+                        "result_limit": top_k,
+                        "dataset_name": dataset_name,
+                    }
+                )
+                rows = result.fetchall()
+                
+                strategy_label = "Vector Only" if effective_strategy == "vector" else "Hybrid (BM25 + Vector)"
+                click.echo(f"RETRIEVED FIELDS ({strategy_label})")
+                click.echo("-" * 40)
+                
+                if not rows:
+                    click.echo("  (no fields matched)")
+                else:
+                    for i, row in enumerate(rows, 1):
+                        field_name = row.field_path or row.title
+                        click.echo(f"  {i}. {field_name}")
+                        click.echo(f"     Type: {row.content.get('data_type', 'unknown') if row.content else 'unknown'}")
+                        if show_scores:
+                            click.echo(f"     BM25: {row.bm25_score:.4f}, Vector: {row.vector_score:.4f}, RRF: {row.rrf_score:.4f}")
+                        if row.content:
+                            desc = row.content.get("description", "")
+                            if desc:
+                                desc = desc[:60] + "..." if len(desc) > 60 else desc
+                                click.echo(f"     Desc: {desc}")
             
+            # Show examples if requested
             if show_examples:
                 click.echo(f"\nMATCHING EXAMPLES")
                 click.echo("-" * 40)
                 
-                if context.examples:
-                    for i, ex in enumerate(context.examples, 1):
-                        q = ex.question[:50] + "..." if len(ex.question) > 50 else ex.question
+                # Use keyword search for examples too
+                result = await session.execute(
+                    text("""
+                        SELECT 
+                            n.id,
+                            n.title,
+                            n.content,
+                            ts_rank_cd(n.search_vector, plainto_tsquery('english', :query)) as score
+                        FROM agent.knowledge_nodes n
+                        WHERE n.tenant_id = :tenant_id
+                        AND n.dataset_name = :dataset_name
+                        AND n.node_type = 'example'
+                        AND n.is_deleted = FALSE
+                        AND n.status = 'published'
+                        AND (
+                            n.search_vector @@ plainto_tsquery('english', :query)
+                            OR n.title ILIKE :like_query
+                            OR n.content::text ILIKE :like_query
+                        )
+                        ORDER BY score DESC NULLS LAST
+                        LIMIT 5
+                    """),
+                    {
+                        "tenant_id": tenant_id,
+                        "dataset_name": dataset_name,
+                        "query": question,
+                        "like_query": f"%{question}%",
+                    }
+                )
+                examples = result.fetchall()
+                
+                if examples:
+                    for i, ex in enumerate(examples, 1):
+                        q = ex.title[:50] + "..." if len(ex.title) > 50 else ex.title
                         click.echo(f"  {i}. Q: {q}")
-                        query_preview = ex.query[:60] + "..." if len(ex.query) > 60 else ex.query
-                        click.echo(f"     A: {query_preview}")
+                        if ex.content:
+                            query_str = ex.content.get("query", "")
+                            if query_str:
+                                query_preview = query_str[:60] + "..." if len(query_str) > 60 else query_str
+                                click.echo(f"     A: {query_preview}")
+                            verified = ex.content.get("verified", False)
+                            click.echo(f"     Verified: {verified}")
+                        if show_scores and ex.score:
+                            click.echo(f"     Score: {ex.score:.4f}")
                 else:
                     click.echo("  (no examples matched)")
             
-            click.echo(f"\nSTATISTICS")
+            # Summary statistics
+            click.echo(f"\nSUMMARY")
             click.echo("-" * 40)
-            click.echo(f"  Fields retrieved: {len(context.fields)}")
-            click.echo(f"  Fields expanded: {len(context.expanded_fields)}")
-            click.echo(f"  Examples matched: {len(context.examples)}")
-            if context.expansion_stats:
-                click.echo(f"  Concepts matched: {context.expansion_stats.get('concept_count', 0)}")
-                click.echo(f"  Keywords extracted: {context.expansion_stats.get('keyword_count', 0)}")
+            click.echo(f"  Total fields in schema: {len(fields)}")
+            click.echo(f"  Strategy used: {effective_strategy}")
+            if effective_strategy != strategy:
+                click.echo(f"  (requested: {strategy}, fallback due to missing embeddings)")
     
     run_async(_test_retrieval())
 

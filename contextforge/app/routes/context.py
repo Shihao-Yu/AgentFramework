@@ -26,10 +26,10 @@ async def get_user_tenant_ids(
     tenant_service = TenantService(session)
     tenants = await tenant_service.get_user_tenants(user_id)
     if not tenants:
-        tenants = ["default", "shared"]
-    else:
-        if "shared" not in tenants:
-            tenants.append("shared")
+        all_tenants = await tenant_service.list_tenants()
+        tenants = [t.id for t in all_tenants]
+    if "shared" not in tenants:
+        tenants.append("shared")
     return tenants
 
 
@@ -53,14 +53,16 @@ async def get_context(
     """
     user_tenant_ids = await get_user_tenant_ids(session, current_user)
     
-    allowed_tenants = [t for t in request.tenant_ids if t in user_tenant_ids]
-    if not allowed_tenants:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No access to requested tenants"
-        )
-    
-    request.tenant_ids = allowed_tenants
+    if not request.tenant_ids:
+        request.tenant_ids = user_tenant_ids
+    else:
+        allowed_tenants = [t for t in request.tenant_ids if t in user_tenant_ids]
+        if not allowed_tenants:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No access to requested tenants"
+            )
+        request.tenant_ids = allowed_tenants
     
     service = ContextService(session, embedding_client)
     return await service.get_context(request)
