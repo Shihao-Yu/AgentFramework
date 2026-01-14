@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from 'react'
-import { Network, Search, Filter, Plus, RefreshCw, AlertTriangle } from 'lucide-react'
+import { Network, Search, RefreshCw, Pencil } from 'lucide-react'
 import { ReactFlowProvider } from '@xyflow/react'
 
 import { Button } from '@/components/ui/button'
@@ -8,17 +8,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 import { GraphCanvas } from '@/components/graph/GraphCanvas'
-import { AddNodeModal } from '@/components/graph/AddNodeModal'
 import { AddEdgeDialog } from '@/components/graph/AddEdgeDialog'
-import { GapDetectionPanel } from '@/components/graph/GapDetectionPanel'
+import { NodeEditDialog } from '@/components/graph/NodeEditDialog'
 import { useGraph } from '@/hooks/useGraph'
-import { useNodes } from '@/hooks/useNodes'
 import { useEdges } from '@/hooks/useEdges'
 import { useTenantContext } from '@/components/tenant/TenantProvider'
-import { NodeType, NodeTypeLabels, NodeTypeConfig, EdgeType, EdgeTypeLabels, type CreateNodeRequest, type CreateEdgeRequest } from '@/types/graph'
+import { NodeType, NodeTypeLabels, NodeTypeConfig, EdgeType, EdgeTypeLabels, type CreateEdgeRequest, type GraphNode } from '@/types/graph'
 
 const ALL_NODE_TYPES = Object.values(NodeType) as NodeType[]
 const ALL_EDGE_TYPES = Object.values(EdgeType) as EdgeType[]
@@ -29,16 +26,14 @@ export function GraphExplorerPage() {
   const [selectedEdgeTypes, setSelectedEdgeTypes] = useState<EdgeType[]>(ALL_EDGE_TYPES)
   const [depth, setDepth] = useState(2)
   const [hasLoaded, setHasLoaded] = useState(false)
-  const [rightPanelTab, setRightPanelTab] = useState<'filters' | 'health'>('filters')
   
-  const [addNodeModalOpen, setAddNodeModalOpen] = useState(false)
   const [addEdgeDialogOpen, setAddEdgeDialogOpen] = useState(false)
   const [pendingEdgeSource, setPendingEdgeSource] = useState<number | null>(null)
   const [pendingEdgeTarget, setPendingEdgeTarget] = useState<number | null>(null)
+  const [editingNode, setEditingNode] = useState<GraphNode | null>(null)
 
   const { selectedTenantIds } = useTenantContext()
-  const { nodes, edges, searchMatches, selectedNode, isLoading, search, selectNode, expand } = useGraph()
-  const { createNode } = useNodes()
+  const { nodes, edges, searchMatches, selectedNode, isLoading, search, selectNode } = useGraph()
   const { createEdge } = useEdges()
 
   const loadAllNodes = useCallback(async () => {
@@ -77,9 +72,18 @@ export function GraphExplorerPage() {
     }
   }, [handleSearch])
 
-  const handleNodeDoubleClick = useCallback(async (nodeId: number) => {
-    await expand(nodeId, depth)
-  }, [expand, depth])
+  const handleNodeDoubleClick = useCallback((nodeId: number) => {
+    const node = nodes.find(n => n.id === nodeId)
+    if (node) {
+      setEditingNode(node)
+    }
+  }, [nodes])
+
+  const handleEditNode = useCallback(() => {
+    if (selectedNode) {
+      setEditingNode(selectedNode)
+    }
+  }, [selectedNode])
 
   const toggleNodeType = useCallback((nodeType: NodeType) => {
     setSelectedNodeTypes(prev => 
@@ -110,11 +114,6 @@ export function GraphExplorerPage() {
     [nodes, pendingEdgeTarget]
   )
 
-  const handleCreateNode = useCallback(async (data: CreateNodeRequest) => {
-    await createNode(data)
-    await loadAllNodes()
-  }, [createNode, loadAllNodes])
-
   const handleEdgeCreate = useCallback((sourceId: number, targetId: number) => {
     setPendingEdgeSource(sourceId)
     setPendingEdgeTarget(targetId)
@@ -134,14 +133,8 @@ export function GraphExplorerPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Knowledge Graph Explorer</h1>
           <p className="text-sm text-muted-foreground">
-            Visualize and explore relationships between knowledge nodes. Drag from one node's handle to another to create edges.
+            Visualize and explore relationships between knowledge nodes. Double-click a node to edit.
           </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button size="sm" onClick={() => setAddNodeModalOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Node
-          </Button>
         </div>
       </div>
 
@@ -196,101 +189,78 @@ export function GraphExplorerPage() {
         </Card>
 
         <div className="flex w-80 shrink-0 flex-col gap-4 overflow-y-auto">
-          <Tabs value={rightPanelTab} onValueChange={(v) => setRightPanelTab(v as 'filters' | 'health')}>
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="filters" className="flex items-center gap-2">
-                <Filter className="h-4 w-4" />
-                Filters
-              </TabsTrigger>
-              <TabsTrigger value="health" className="flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4" />
-                Health
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="filters" className="space-y-4 mt-4">
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Node Types</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {ALL_NODE_TYPES.map((type) => {
-                    const config = NodeTypeConfig[type]
-                    return (
-                      <div key={type} className="flex items-center gap-2">
-                        <Checkbox
-                          id={`node-${type}`}
-                          checked={selectedNodeTypes.includes(type)}
-                          onCheckedChange={() => toggleNodeType(type)}
-                        />
-                        <Label
-                          htmlFor={`node-${type}`}
-                          className="flex items-center gap-2 text-sm font-normal"
-                        >
-                          <span>{config.icon}</span>
-                          <span>{NodeTypeLabels[type]}</span>
-                        </Label>
-                      </div>
-                    )
-                  })}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Edge Types</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {ALL_EDGE_TYPES.map((type) => (
-                    <div key={type} className="flex items-center gap-2">
-                      <Checkbox
-                        id={`edge-${type}`}
-                        checked={selectedEdgeTypes.includes(type)}
-                        onCheckedChange={() => toggleEdgeType(type)}
-                      />
-                      <Label
-                        htmlFor={`edge-${type}`}
-                        className="text-sm font-normal"
-                      >
-                        {EdgeTypeLabels[type]}
-                      </Label>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Expansion Depth</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center gap-2">
-                    {[1, 2, 3, 4, 5].map((d) => (
-                      <Button
-                        key={d}
-                        variant={depth === d ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setDepth(d)}
-                      >
-                        {d}
-                      </Button>
-                    ))}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Node Types</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {ALL_NODE_TYPES.map((type) => {
+                const config = NodeTypeConfig[type]
+                return (
+                  <div key={type} className="flex items-center gap-2">
+                    <Checkbox
+                      id={`node-${type}`}
+                      checked={selectedNodeTypes.includes(type)}
+                      onCheckedChange={() => toggleNodeType(type)}
+                    />
+                    <Label
+                      htmlFor={`node-${type}`}
+                      className="flex items-center gap-2 text-sm font-normal"
+                    >
+                      <span>{config.icon}</span>
+                      <span>{NodeTypeLabels[type]}</span>
+                    </Label>
                   </div>
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    Hops from search results
-                  </p>
-                </CardContent>
-              </Card>
-            </TabsContent>
+                )
+              })}
+            </CardContent>
+          </Card>
 
-            <TabsContent value="health" className="mt-4">
-              <GapDetectionPanel
-                selectedNode={selectedNode}
-                onNodeSelect={selectNode}
-                onRefreshGraph={loadAllNodes}
-              />
-            </TabsContent>
-          </Tabs>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Edge Types</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {ALL_EDGE_TYPES.map((type) => (
+                <div key={type} className="flex items-center gap-2">
+                  <Checkbox
+                    id={`edge-${type}`}
+                    checked={selectedEdgeTypes.includes(type)}
+                    onCheckedChange={() => toggleEdgeType(type)}
+                  />
+                  <Label
+                    htmlFor={`edge-${type}`}
+                    className="text-sm font-normal"
+                  >
+                    {EdgeTypeLabels[type]}
+                  </Label>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Expansion Depth</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-2">
+                {[1, 2, 3, 4, 5].map((d) => (
+                  <Button
+                    key={d}
+                    variant={depth === d ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setDepth(d)}
+                  >
+                    {d}
+                  </Button>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Hops from search results
+              </p>
+            </CardContent>
+          </Card>
 
           {selectedNode && (
             <Card>
@@ -317,14 +287,10 @@ export function GraphExplorerPage() {
                     </Badge>
                   ))}
                 </div>
-                <div className="flex gap-2 pt-2">
-                  <Button variant="outline" size="sm" className="flex-1">
-                    View Details
-                  </Button>
-                  <Button variant="outline" size="sm" className="flex-1">
-                    Edit
-                  </Button>
-                </div>
+                <Button variant="outline" size="sm" className="w-full" onClick={handleEditNode}>
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Edit
+                </Button>
               </CardContent>
             </Card>
           )}
@@ -353,15 +319,6 @@ export function GraphExplorerPage() {
         </div>
       </div>
 
-      <AddNodeModal
-        open={addNodeModalOpen}
-        onOpenChange={setAddNodeModalOpen}
-        onSubmit={handleCreateNode}
-        tenantId={selectedTenantIds[0] || 'default'}
-        connectToNodeId={selectedNode?.id}
-        connectToNodeTitle={selectedNode?.title}
-      />
-
       <AddEdgeDialog
         open={addEdgeDialogOpen}
         onOpenChange={(open) => {
@@ -374,6 +331,18 @@ export function GraphExplorerPage() {
         onSubmit={handleCreateEdge}
         sourceNode={pendingSourceNode}
         targetNode={pendingTargetNode}
+      />
+
+      <NodeEditDialog
+        node={editingNode}
+        open={!!editingNode}
+        onOpenChange={(open) => {
+          if (!open) setEditingNode(null)
+        }}
+        onSaved={() => {
+          setEditingNode(null)
+          loadAllNodes()
+        }}
       />
     </div>
   )

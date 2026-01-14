@@ -18,8 +18,8 @@ Usage:
 from typing import Any, Dict, List, Optional, Union
 from datetime import datetime
 import logging
-import re
 
+from pydantic import BaseModel, Field
 from sqlmodel import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text, desc as sql_desc
@@ -28,7 +28,15 @@ from app.models.enums import NodeType, EdgeType, KnowledgeStatus, Visibility
 from app.models.nodes import KnowledgeNode
 from app.models.edges import KnowledgeEdge
 from app.clients.embedding_client import EmbeddingClient
+from app.utils.schema import sql as schema_sql
 from app.services.queryforge_adapter import KnowledgeVerseAdapter
+from app.utils.query_validator import QueryValidator, QueryValidationResult
+
+
+class GeneratedQuery(BaseModel):
+    query: str = Field(description="The generated SQL/DSL query")
+    explanation: Optional[str] = Field(default=None, description="Brief explanation of the query logic")
+    confidence: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="Confidence score 0-1")
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +52,11 @@ from app.contextforge.sources import (
 )
 from app.contextforge.schema import FieldSpec as UnifiedField
 from app.contextforge.core import QueryType
+
+# Availability flags for the two backends
+_QUERYFORGE_AVAILABLE: bool = False  # External AgenticSearch QueryForge
+_CONTEXTFORGE_AVAILABLE: bool = True  # Local ContextForge (always available when imports succeed)
+_IMPORT_ERROR: Optional[str] = None
 
 
 SOURCE_TYPE_MAP = {
@@ -78,20 +91,13 @@ class QueryForgeService:
         embedding_client: EmbeddingClient,
         vector_store: Optional[Any] = None,
         llm_client: Optional[Any] = None,
+        langfuse_client: Optional[Any] = None,
     ):
-        """
-        Initialize QueryForge service.
-        
-        Args:
-            session: Database session for node/edge operations
-            embedding_client: Client for generating embeddings
-            vector_store: Optional ChromaDB vector store for AgenticSearch
-            llm_client: Optional LLM client for enrichment and generation
-        """
         self.session = session
         self.embedding_client = embedding_client
         self.vector_store = vector_store
         self.llm_client = llm_client
+        self.langfuse_client = langfuse_client
     
     @staticmethod
     def is_available() -> bool:
@@ -294,11 +300,11 @@ class QueryForgeService:
         
         # Update embedding
         await self.session.execute(
-            text("""
-                UPDATE agent.knowledge_nodes 
+            text(schema_sql("""
+                UPDATE {schema}.knowledge_nodes 
                 SET embedding = :embedding::vector 
                 WHERE id = :id
-            """),
+            """)),
             {"id": node.id, "embedding": embedding}
         )
         
@@ -366,11 +372,11 @@ class QueryForgeService:
             
             # Update embedding
             await self.session.execute(
-                text("""
-                    UPDATE agent.knowledge_nodes 
+                text(schema_sql("""
+                    UPDATE {schema}.knowledge_nodes 
                     SET embedding = :embedding::vector 
                     WHERE id = :id
-                """),
+                """)),
                 {"id": node.id, "embedding": embedding}
             )
             
@@ -406,32 +412,8 @@ class QueryForgeService:
         question: str,
         include_explanation: bool = False,
         use_pipeline: bool = True,
+        execute: bool = False,
     ) -> Dict[str, Any]:
-        """
-        Generate a query from natural language.
-        
-        Uses the schema_index and schema_field nodes for context,
-        then delegates to AgenticSearch for query generation.
-        
-        When use_pipeline=True and AgenticSearch is available, this method
-        creates a KnowledgeVerseAdapter to bridge our PostgreSQL storage
-        with QueryForge's QueryGenerationPipeline.
-        
-        Args:
-            tenant_id: Tenant identifier
-            dataset_name: Dataset to query against
-            question: Natural language question
-            include_explanation: Whether to include query explanation
-            use_pipeline: Whether to use QueryGenerationPipeline (default True)
-        
-        Returns:
-            Dict with:
-                - status: "success" or "error"
-                - query: Generated query string
-                - query_type: Type of query (sql, elasticsearch, api)
-                - explanation: Optional explanation
-                - confidence: Confidence score (if using pipeline)
-        """
         if not self.llm_client:
             return {
                 "status": "error",
@@ -439,7 +421,6 @@ class QueryForgeService:
             }
         
         try:
-            # Get schema context from our nodes
             context = await self._build_query_context(tenant_id, dataset_name)
             
             if not context:
@@ -467,20 +448,34 @@ class QueryForgeService:
                     user_question=question,
                 )
                 
-                return {
+                response = {
                     "status": "success",
                     "query": result.query,
                     "query_type": context.get("source_type", "sql"),
                     "explanation": getattr(result, "explanation", None) if include_explanation else None,
                     "confidence": getattr(result, "confidence", None),
                 }
+                
+                if execute and result.query:
+                    execution_result = await self._execute_query(result.query, context.get("source_type", "sql"))
+                    response["execution"] = execution_result
+                
+                return response
             
-            # Direct LLM call fallback
-            return await self._generate_query_direct(
+            gen_result = await self._generate_query_direct(
                 context=context,
                 question=question,
                 include_explanation=include_explanation,
             )
+            
+            if execute and gen_result.get("status") == "success" and gen_result.get("query"):
+                execution_result = await self._execute_query(
+                    gen_result["query"], 
+                    gen_result.get("query_type", "sql")
+                )
+                gen_result["execution"] = execution_result
+            
+            return gen_result
             
         except Exception as e:
             logger.exception(f"Failed to generate query for {dataset_name}")
@@ -551,102 +546,167 @@ class QueryForgeService:
             ],
         }
     
+    async def _execute_query(
+        self,
+        query: str,
+        source_type: str,
+    ) -> Dict[str, Any]:
+        from app.core.config import settings
+        import asyncio
+        import time
+        
+        if source_type not in ("postgres", "mysql", "clickhouse", "sql"):
+            return {
+                "status": "error",
+                "error": f"Execution not supported for source type: {source_type}",
+            }
+        
+        start_time = time.perf_counter()
+        
+        try:
+            async def run_query():
+                result = await self.session.execute(text(query))
+                return result
+            
+            result = await asyncio.wait_for(
+                run_query(),
+                timeout=settings.QUERYFORGE_EXECUTION_TIMEOUT
+            )
+            
+            elapsed_ms = (time.perf_counter() - start_time) * 1000
+            
+            rows = result.fetchmany(settings.QUERYFORGE_MAX_ROWS + 1)
+            truncated = len(rows) > settings.QUERYFORGE_MAX_ROWS
+            if truncated:
+                rows = rows[:settings.QUERYFORGE_MAX_ROWS]
+            
+            columns = list(result.keys()) if result.keys() else []
+            
+            data = [dict(zip(columns, row)) for row in rows]
+            
+            return {
+                "status": "success",
+                "columns": columns,
+                "rows": data,
+                "row_count": len(data),
+                "truncated": truncated,
+                "execution_time_ms": round(elapsed_ms, 2),
+            }
+            
+        except asyncio.TimeoutError:
+            await self.session.rollback()
+            return {
+                "status": "error",
+                "error": f"Query timed out after {settings.QUERYFORGE_EXECUTION_TIMEOUT}s",
+            }
+        except Exception as e:
+            await self.session.rollback()
+            return {
+                "status": "error",
+                "error": str(e),
+            }
+    
     async def _generate_query_direct(
         self,
         context: Dict[str, Any],
         question: str,
         include_explanation: bool,
+        validate_query: bool = True,
+        prompt_name: str = "query_generation",
     ) -> Dict[str, Any]:
-        """Generate query using direct LLM call with node context."""
-        # Build prompt from context
         source_type = context.get("source_type", "postgres")
         
-        prompt = self._build_generation_prompt(
-            source_type=source_type,
-            schema_context=context,
-            question=question,
-            include_explanation=include_explanation,
+        prompt_config = None
+        if self.langfuse_client:
+            prompt_config = self.langfuse_client.get_prompt_config(prompt_name)
+        
+        system_prompt = self._build_system_prompt(source_type, context)
+        user_prompt = self._build_user_prompt(question, include_explanation)
+        
+        result = await self.llm_client.generate_structured(
+            prompt=user_prompt,
+            response_model=GeneratedQuery,
+            system_prompt=system_prompt,
+            temperature=prompt_config.temperature if prompt_config else 0.0,
+            model=prompt_config.model if prompt_config else None,
         )
         
-        # Call LLM
-        response = await self.llm_client.submit_prompt(prompt)
+        raw_query = result.query
         
-        # Extract query from response
-        query = self._extract_query(response, source_type)
+        if validate_query and source_type in ("postgres", "mysql", "clickhouse"):
+            validator = QueryValidator(max_limit=1000, require_limit=True)
+            validation_result = validator.validate(raw_query)
+            
+            if not validation_result.is_valid:
+                return {
+                    "status": "error",
+                    "error": f"Generated query failed validation: {validation_result.error}",
+                    "raw_query": raw_query,
+                    "query_type": source_type,
+                }
+            
+            return {
+                "status": "success",
+                "query": validation_result.sanitized_query,
+                "query_type": source_type,
+                "explanation": result.explanation if include_explanation else None,
+                "confidence": result.confidence,
+                "validation": {
+                    "is_valid": True,
+                    "warnings": validation_result.warnings,
+                },
+            }
         
         return {
             "status": "success",
-            "query": query,
+            "query": raw_query,
             "query_type": source_type,
-            "explanation": response if include_explanation else None,
+            "explanation": result.explanation if include_explanation else None,
+            "confidence": result.confidence,
         }
     
-    def _build_generation_prompt(
-        self,
-        source_type: str,
-        schema_context: Dict[str, Any],
-        question: str,
-        include_explanation: bool,
-    ) -> str:
-        """Build LLM prompt for query generation."""
-        # Format fields
+    def _get_query_format(self, source_type: str) -> str:
+        if source_type in ("postgres", "mysql", "clickhouse"):
+            return "SQL"
+        elif source_type == "elasticsearch":
+            return "OpenSearch DSL (JSON)"
+        elif source_type == "api":
+            return "REST API request"
+        return "query"
+    
+    def _build_system_prompt(self, source_type: str, context: Dict[str, Any]) -> str:
+        query_format = self._get_query_format(source_type)
+        
         fields_text = "\n".join([
             f"- {f['path']} ({f['type']}): {f['description']}"
             + (f" [values: {', '.join(f['allowed_values'][:5])}]" if f.get('allowed_values') else "")
-            for f in schema_context.get("fields", [])[:50]  # Limit fields
+            for f in context.get("fields", [])[:50]
         ])
         
-        # Format examples
         examples_text = ""
-        examples = schema_context.get("examples", [])
+        examples = context.get("examples", [])
         if examples:
-            examples_text = "Examples:\n" + "\n".join([
+            examples_text = "\n\nExamples:\n" + "\n".join([
                 f"Q: {e['question']}\nA: {e['query']}"
                 for e in examples[:5]
             ])
         
-        # Build prompt based on source type
-        if source_type in ("postgres", "mysql", "clickhouse"):
-            query_format = "SQL"
-        elif source_type == "elasticsearch":
-            query_format = "OpenSearch DSL (JSON)"
-        elif source_type == "api":
-            query_format = "REST API request"
-        else:
-            query_format = "query"
-        
-        prompt = f"""Generate a {query_format} query for the following question.
+        return f"""You are a {query_format} query generator.
 
-Dataset: {schema_context.get('dataset_name', 'unknown')}
-Description: {schema_context.get('description', '')}
+Dataset: {context.get('dataset_name', 'unknown')}
+Description: {context.get('description', '')}
 
 Schema:
-{fields_text}
+{fields_text}{examples_text}
 
-{examples_text}
-
-Question: {question}
-
-Generate only the {query_format} query. {"Include a brief explanation." if include_explanation else "Do not include explanation."}
-"""
-        return prompt
+Generate valid {query_format} queries based on user questions."""
     
-    def _extract_query(self, response: str, source_type: str) -> str:
-        """Extract query from LLM response."""
-        # Try to extract from code blocks
-        if source_type in ("postgres", "mysql", "clickhouse"):
-            # SQL code block
-            match = re.search(r"```(?:sql)?\s*(.*?)```", response, re.DOTALL | re.IGNORECASE)
-            if match:
-                return match.group(1).strip()
-        elif source_type == "elasticsearch":
-            # JSON code block
-            match = re.search(r"```(?:json)?\s*(.*?)```", response, re.DOTALL | re.IGNORECASE)
-            if match:
-                return match.group(1).strip()
-        
-        # Fallback: return full response
-        return response.strip()
+    def _build_user_prompt(self, question: str, include_explanation: bool) -> str:
+        if include_explanation:
+            return f"{question}\n\nInclude a brief explanation of the query logic."
+        return question
+    
+
     
     # -------------------------------------------------------------------------
     # Example Management
@@ -721,11 +781,11 @@ Generate only the {query_format} query. {"Include a brief explanation." if inclu
             
             # Update embedding
             await self.session.execute(
-                text("""
-                    UPDATE agent.knowledge_nodes 
+                text(schema_sql("""
+                    UPDATE {schema}.knowledge_nodes 
                     SET embedding = :embedding::vector 
                     WHERE id = :id
-                """),
+                """)),
                 {"id": node.id, "embedding": embedding}
             )
             
@@ -981,10 +1041,10 @@ Generate only the {query_format} query. {"Include a brief explanation." if inclu
                 for node in nodes:
                     # Delete edges
                     await self.session.execute(
-                        text("""
-                            DELETE FROM agent.knowledge_edges 
+                        text(schema_sql("""
+                            DELETE FROM {schema}.knowledge_edges 
                             WHERE source_id = :node_id OR target_id = :node_id
-                        """),
+                        """)),
                         {"node_id": node.id}
                     )
                     

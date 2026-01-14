@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_session
-from app.core.dependencies import get_embedding_client, get_current_user
+from app.core.dependencies import get_embedding_client, get_optional_embedding_client, get_current_user
 from app.clients.embedding_client import EmbeddingClient
 from app.services.node_service import NodeService
 from app.services.edge_service import EdgeService
@@ -56,10 +56,10 @@ async def list_nodes(
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
     session: AsyncSession = Depends(get_session),
-    embedding_client: EmbeddingClient = Depends(get_embedding_client),
-    current_user: str = Depends(get_current_user),
+    embedding_client: Optional[EmbeddingClient] = Depends(get_optional_embedding_client),
+    current_user: dict = Depends(get_current_user),
 ):
-    user_tenant_ids = await get_user_tenant_ids(session, current_user)
+    user_tenant_ids = await get_user_tenant_ids(session, current_user.get("user_id", "anonymous"))
     
     params = NodeListParams(
         tenant_ids=tenant_ids,
@@ -87,9 +87,9 @@ async def search_nodes(
     limit: int = Query(20, ge=1, le=100),
     session: AsyncSession = Depends(get_session),
     embedding_client: EmbeddingClient = Depends(get_embedding_client),
-    current_user: str = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
 ):
-    user_tenant_ids = await get_user_tenant_ids(session, current_user)
+    user_tenant_ids = await get_user_tenant_ids(session, current_user.get("user_id", "anonymous"))
     
     service = NodeService(session, embedding_client)
     results = await service.hybrid_search(
@@ -115,10 +115,10 @@ async def get_node(
     node_id: int,
     include_edges: bool = Query(True),
     session: AsyncSession = Depends(get_session),
-    embedding_client: EmbeddingClient = Depends(get_embedding_client),
-    current_user: str = Depends(get_current_user),
+    embedding_client: Optional[EmbeddingClient] = Depends(get_optional_embedding_client),
+    current_user: dict = Depends(get_current_user),
 ):
-    user_tenant_ids = await get_user_tenant_ids(session, current_user)
+    user_tenant_ids = await get_user_tenant_ids(session, current_user.get("user_id", "anonymous"))
     
     service = NodeService(session, embedding_client)
     node = await service.get_node(node_id, user_tenant_ids)
@@ -148,12 +148,13 @@ async def create_node(
     data: NodeCreate,
     session: AsyncSession = Depends(get_session),
     embedding_client: EmbeddingClient = Depends(get_embedding_client),
-    current_user: str = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
 ):
-    user_tenant_ids = await get_user_tenant_ids(session, current_user)
+    user_id = current_user.get("user_id", "anonymous")
+    user_tenant_ids = await get_user_tenant_ids(session, user_id)
     
     service = NodeService(session, embedding_client)
-    node = await service.create_node(data, user_tenant_ids, created_by=current_user)
+    node = await service.create_node(data, user_tenant_ids, created_by=user_id)
     
     if not node:
         raise HTTPException(
@@ -170,12 +171,13 @@ async def update_node(
     data: NodeUpdate,
     session: AsyncSession = Depends(get_session),
     embedding_client: EmbeddingClient = Depends(get_embedding_client),
-    current_user: str = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
 ):
-    user_tenant_ids = await get_user_tenant_ids(session, current_user)
+    user_id = current_user.get("user_id", "anonymous")
+    user_tenant_ids = await get_user_tenant_ids(session, user_id)
     
     service = NodeService(session, embedding_client)
-    node = await service.update_node(node_id, data, user_tenant_ids, updated_by=current_user)
+    node = await service.update_node(node_id, data, user_tenant_ids, updated_by=user_id)
     
     if not node:
         raise HTTPException(
@@ -190,13 +192,14 @@ async def update_node(
 async def delete_node(
     node_id: int,
     session: AsyncSession = Depends(get_session),
-    embedding_client: EmbeddingClient = Depends(get_embedding_client),
-    current_user: str = Depends(get_current_user),
+    embedding_client: Optional[EmbeddingClient] = Depends(get_optional_embedding_client),
+    current_user: dict = Depends(get_current_user),
 ):
-    user_tenant_ids = await get_user_tenant_ids(session, current_user)
+    user_id = current_user.get("user_id", "anonymous")
+    user_tenant_ids = await get_user_tenant_ids(session, user_id)
     
     service = NodeService(session, embedding_client)
-    success = await service.delete_node(node_id, user_tenant_ids, deleted_by=current_user)
+    success = await service.delete_node(node_id, user_tenant_ids, deleted_by=user_id)
     
     if not success:
         raise HTTPException(
@@ -212,10 +215,10 @@ async def list_node_versions(
     node_id: int,
     limit: int = Query(20, ge=1, le=100),
     session: AsyncSession = Depends(get_session),
-    embedding_client: EmbeddingClient = Depends(get_embedding_client),
-    current_user: str = Depends(get_current_user),
+    embedding_client: Optional[EmbeddingClient] = Depends(get_optional_embedding_client),
+    current_user: dict = Depends(get_current_user),
 ):
-    user_tenant_ids = await get_user_tenant_ids(session, current_user)
+    user_tenant_ids = await get_user_tenant_ids(session, current_user.get("user_id", "anonymous"))
     
     service = NodeService(session, embedding_client)
     versions = await service.get_node_versions(node_id, user_tenant_ids, limit)

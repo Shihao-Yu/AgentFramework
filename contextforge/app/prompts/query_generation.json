@@ -1,0 +1,9 @@
+{
+  "name": "query_generation",
+  "config": {
+    "model": "gpt-4o-mini",
+    "context_window": 128000,
+    "max_output_tokens": 4096,
+    "temperature": 0.0
+  }
+}

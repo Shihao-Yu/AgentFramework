@@ -13,6 +13,7 @@ import { SettingsPage } from '@/pages/SettingsPage'
 import { GraphExplorerPage } from '@/pages/GraphExplorerPage'
 import { EntitiesPage } from '@/pages/EntitiesPage'
 import { ConceptsPage } from '@/pages/ConceptsPage'
+import { OnboardingPage } from '@/pages/OnboardingPage'
 import { useAppConfig } from '@/AppContext'
 
 const queryClient = new QueryClient({
@@ -35,6 +36,7 @@ function AppRoutes() {
         <Route path="playbooks" element={<PlaybooksPage />} />
         <Route path="entities" element={<EntitiesPage />} />
         <Route path="concepts" element={<ConceptsPage />} />
+        <Route path="onboarding" element={<OnboardingPage />} />
         <Route path="staging" element={<StagingQueuePage />} />
         <Route path="analytics" element={<MetricsDashboardPage />} />
         <Route path="graph-analytics" element={<GraphAnalyticsPage />} />

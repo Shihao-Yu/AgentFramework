@@ -26,6 +26,9 @@ dependencies = [
     "pydantic>=2.5.0",
     "pydantic-settings>=2.1.0",
     
+    # Shared Infrastructure
+    "infra[inference,embedding,tracing]",
+    
     # Database
     "sqlalchemy[asyncio]>=2.0.25",
     "sqlmodel>=0.0.14",
@@ -43,12 +46,18 @@ dependencies = [
     # Utilities
     "python-dotenv>=1.0.0",
     "python-multipart>=0.0.6",
+    "sqlparse>=0.5.0",
+    "tiktoken>=0.7.0",
+    "rich>=13.0.0",
     
     # Graph (for Knowledge Verse)
     "networkx>=3.0",
     
     # CLI
     "click>=8.0.0",
+    
+    # Prompt management & observability
+    "langfuse>=2.0.0",
     
     # AgenticSearch QueryForge (local dependency)
     # Install from local path: pip install -e ../agentic_search
@@ -65,6 +74,7 @@ embeddings = [
 # OpenAI integration
 openai = [
     "openai>=1.0.0",
+    "instructor>=1.0.0",
 ]
 
 # JWT authentication
@@ -77,6 +87,7 @@ all = [
     "sentence-transformers>=2.2.0",
     "torch>=2.0.0",
     "openai>=1.0.0",
+    "instructor>=1.0.0",
     "pyjwt>=2.8.0",
 ]
 

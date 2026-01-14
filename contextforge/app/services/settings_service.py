@@ -10,6 +10,7 @@ from app.schemas.settings import (
     MaintenanceSettings,
 )
 from app.core.config import settings as app_settings
+from app.utils.schema import sql as schema_sql
 
 
 DEFAULTS = {
@@ -39,7 +40,7 @@ class SettingsService:
 
     async def get_settings(self) -> SettingsResponse:
         result = await self.session.execute(
-            text("SELECT category, settings FROM agent.system_settings")
+            text(schema_sql("SELECT category, settings FROM {schema}.system_settings"))
         )
         rows = {row.category: row.settings for row in result.fetchall()}
 
@@ -64,13 +65,13 @@ class SettingsService:
         for category, data in updates:
             if data is not None:
                 await self.session.execute(
-                    text("""
-                        INSERT INTO agent.system_settings (category, settings, updated_at)
+                    text(schema_sql("""
+                        INSERT INTO {schema}.system_settings (category, settings, updated_at)
                         VALUES (:category, :settings, :updated_at)
                         ON CONFLICT (category) DO UPDATE SET
                             settings = EXCLUDED.settings,
                             updated_at = EXCLUDED.updated_at
-                    """),
+                    """)),
                     {
                         "category": category,
                         "settings": data.model_dump_json(),

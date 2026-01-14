@@ -18,6 +18,7 @@ from app.schemas.edges import (
     EdgeListParams,
     EdgeResponse,
 )
+from app.utils.schema import sql as schema_sql
 
 
 class EdgeService:
@@ -29,24 +30,24 @@ class EdgeService:
         params: EdgeListParams,
         user_tenant_ids: List[str],
     ) -> Tuple[List[EdgeResponse], int]:
-        base_query = """
+        base_query = schema_sql("""
             SELECT e.id, e.source_id, e.target_id, e.edge_type, e.weight,
                    e.is_auto_generated, e.metadata_, e.created_by, e.created_at,
                    sn.title as source_title, tn.title as target_title,
                    sn.node_type as source_node_type, tn.node_type as target_node_type
-            FROM agent.knowledge_edges e
-            JOIN agent.knowledge_nodes sn ON e.source_id = sn.id AND sn.is_deleted = FALSE
-            JOIN agent.knowledge_nodes tn ON e.target_id = tn.id AND tn.is_deleted = FALSE
+            FROM {schema}.knowledge_edges e
+            JOIN {schema}.knowledge_nodes sn ON e.source_id = sn.id AND sn.is_deleted = FALSE
+            JOIN {schema}.knowledge_nodes tn ON e.target_id = tn.id AND tn.is_deleted = FALSE
             WHERE (sn.tenant_id = ANY(:tenant_ids) OR tn.tenant_id = ANY(:tenant_ids))
-        """
+        """)
         
-        count_query = """
+        count_query = schema_sql("""
             SELECT COUNT(*)
-            FROM agent.knowledge_edges e
-            JOIN agent.knowledge_nodes sn ON e.source_id = sn.id AND sn.is_deleted = FALSE
-            JOIN agent.knowledge_nodes tn ON e.target_id = tn.id AND tn.is_deleted = FALSE
+            FROM {schema}.knowledge_edges e
+            JOIN {schema}.knowledge_nodes sn ON e.source_id = sn.id AND sn.is_deleted = FALSE
+            JOIN {schema}.knowledge_nodes tn ON e.target_id = tn.id AND tn.is_deleted = FALSE
             WHERE (sn.tenant_id = ANY(:tenant_ids) OR tn.tenant_id = ANY(:tenant_ids))
-        """
+        """)
         
         filters = []
         bind_params = {"tenant_ids": user_tenant_ids}
@@ -109,17 +110,17 @@ class EdgeService:
         user_tenant_ids: List[str],
     ) -> Optional[EdgeResponse]:
         result = await self.session.execute(
-            text("""
+            text(schema_sql("""
                 SELECT e.id, e.source_id, e.target_id, e.edge_type, e.weight,
                        e.is_auto_generated, e.metadata_, e.created_by, e.created_at,
                        sn.title as source_title, tn.title as target_title,
                        sn.node_type as source_node_type, tn.node_type as target_node_type
-                FROM agent.knowledge_edges e
-                JOIN agent.knowledge_nodes sn ON e.source_id = sn.id AND sn.is_deleted = FALSE
-                JOIN agent.knowledge_nodes tn ON e.target_id = tn.id AND tn.is_deleted = FALSE
+                FROM {schema}.knowledge_edges e
+                JOIN {schema}.knowledge_nodes sn ON e.source_id = sn.id AND sn.is_deleted = FALSE
+                JOIN {schema}.knowledge_nodes tn ON e.target_id = tn.id AND tn.is_deleted = FALSE
                 WHERE e.id = :edge_id
                   AND (sn.tenant_id = ANY(:tenant_ids) OR tn.tenant_id = ANY(:tenant_ids))
-            """),
+            """)),
             {"edge_id": edge_id, "tenant_ids": user_tenant_ids}
         )
         
@@ -150,10 +151,10 @@ class EdgeService:
         created_by: Optional[str] = None,
     ) -> Optional[KnowledgeEdge]:
         nodes_result = await self.session.execute(
-            text("""
-                SELECT id, tenant_id FROM agent.knowledge_nodes 
+            text(schema_sql("""
+                SELECT id, tenant_id FROM {schema}.knowledge_nodes 
                 WHERE id IN (:source_id, :target_id) AND is_deleted = FALSE
-            """),
+            """)),
             {"source_id": data.source_id, "target_id": data.target_id}
         )
         nodes = {row.id: row.tenant_id for row in nodes_result.fetchall()}
@@ -167,12 +168,12 @@ class EdgeService:
             return None
         
         existing = await self.session.execute(
-            text("""
-                SELECT id FROM agent.knowledge_edges
+            text(schema_sql("""
+                SELECT id FROM {schema}.knowledge_edges
                 WHERE source_id = :source_id 
                   AND target_id = :target_id 
                   AND edge_type = :edge_type
-            """),
+            """)),
             {
                 "source_id": data.source_id,
                 "target_id": data.target_id,
@@ -214,10 +215,10 @@ class EdgeService:
             all_node_ids.add(e.target_id)
         
         nodes_result = await self.session.execute(
-            text("""
-                SELECT id, tenant_id FROM agent.knowledge_nodes 
+            text(schema_sql("""
+                SELECT id, tenant_id FROM {schema}.knowledge_nodes 
                 WHERE id = ANY(:node_ids) AND is_deleted = FALSE
-            """),
+            """)),
             {"node_ids": list(all_node_ids)}
         )
         node_tenants = {row.id: row.tenant_id for row in nodes_result.fetchall()}
@@ -265,10 +266,10 @@ class EdgeService:
             return None
         
         nodes_result = await self.session.execute(
-            text("""
-                SELECT id, tenant_id FROM agent.knowledge_nodes 
+            text(schema_sql("""
+                SELECT id, tenant_id FROM {schema}.knowledge_nodes 
                 WHERE id IN (:source_id, :target_id) AND is_deleted = FALSE
-            """),
+            """)),
             {"source_id": edge.source_id, "target_id": edge.target_id}
         )
         nodes = {row.id: row.tenant_id for row in nodes_result.fetchall()}
@@ -300,10 +301,10 @@ class EdgeService:
             return False
         
         nodes_result = await self.session.execute(
-            text("""
-                SELECT id, tenant_id FROM agent.knowledge_nodes 
+            text(schema_sql("""
+                SELECT id, tenant_id FROM {schema}.knowledge_nodes 
                 WHERE id IN (:source_id, :target_id) AND is_deleted = FALSE
-            """),
+            """)),
             {"source_id": edge.source_id, "target_id": edge.target_id}
         )
         nodes = {row.id: row.tenant_id for row in nodes_result.fetchall()}

@@ -141,38 +141,16 @@ class OpenAILLMProvider:
         temperature: float = 0.0,
         max_tokens: int = 1024,
     ) -> dict:
-        """
-        Generate JSON response using native JSON mode.
-        
-        OpenAI supports JSON mode for guaranteed valid JSON output.
-        
-        Args:
-            prompt: User prompt / input text
-            system_prompt: Optional system prompt for context
-            temperature: Sampling temperature
-            max_tokens: Maximum tokens to generate
-            
-        Returns:
-            Parsed JSON response as dict
-        """
         messages = []
         
-        # Ensure system prompt asks for JSON
         default_system = "You are a helpful assistant that responds with valid JSON."
         if system_prompt:
             full_system = f"{system_prompt}\n\nAlways respond with valid JSON."
         else:
             full_system = default_system
         
-        messages.append({
-            "role": "system",
-            "content": full_system,
-        })
-        
-        messages.append({
-            "role": "user",
-            "content": prompt,
-        })
+        messages.append({"role": "system", "content": full_system})
+        messages.append({"role": "user", "content": prompt})
         
         response = await self._openai_client.chat.completions.create(
             model=self._model,
@@ -184,6 +162,30 @@ class OpenAILLMProvider:
         
         content = response.choices[0].message.content or "{}"
         return json.loads(content)
+    
+    async def generate_structured(
+        self,
+        prompt: str,
+        response_model,
+        system_prompt: Optional[str] = None,
+        temperature: float = 0.0,
+        model: Optional[str] = None,
+    ):
+        import instructor
+        
+        client = instructor.from_openai(self._openai_client)
+        
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+        
+        return await client.chat.completions.create(
+            model=model or self._model,
+            messages=messages,
+            response_model=response_model,
+            temperature=temperature,
+        )
     
     async def generate_stream(
         self,

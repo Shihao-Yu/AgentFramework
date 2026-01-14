@@ -1,25 +1,29 @@
-"""
-Knowledge Verse graph service with NetworkX integration.
-
-Provides in-memory graph operations and traversal capabilities.
-The graph is built from the database as the source of truth.
-"""
-
 from datetime import datetime
-from typing import List, Optional, Dict, Any, Set, Tuple
+from typing import List, Optional, Dict, Any, Set
+import json
+import logging
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 
+from app.utils.schema import sql as schema_sql
+from app.core.config import settings
+
+logger = logging.getLogger(__name__)
+
 try:
     import networkx as nx
+    from networkx.readwrite import json_graph
     HAS_NETWORKX = True
 except ImportError:
     HAS_NETWORKX = False
+    json_graph = None
 
 
 class GraphService:
-    def __init__(self, session: AsyncSession):
+    def __init__(self, session: AsyncSession, redis_client=None):
         self.session = session
+        self.redis_client = redis_client
         self._graph: Optional["nx.DiGraph"] = None
         self._last_sync: Optional[datetime] = None
         self._graph_version: int = 0
@@ -32,6 +36,63 @@ class GraphService:
             self._graph = nx.DiGraph()
         return self._graph
     
+    def _cache_key(self, tenant_ids: List[str]) -> str:
+        sorted_ids = sorted(tenant_ids)
+        return f"{settings.GRAPH_CACHE_KEY_PREFIX}:{':'.join(sorted_ids)}"
+    
+    async def _get_cached_graph(self, tenant_ids: List[str]) -> Optional["nx.DiGraph"]:
+        if not self.redis_client or not self.redis_client.is_connected:
+            return None
+        
+        if not HAS_NETWORKX or json_graph is None:
+            return None
+        
+        try:
+            key = self._cache_key(tenant_ids)
+            data = await self.redis_client.get(key)
+            if data:
+                # Use JSON serialization instead of pickle for security
+                graph_data = json.loads(data.decode("utf-8"))
+                graph = json_graph.node_link_graph(graph_data, directed=True)
+                logger.debug(f"Graph cache hit for tenants {tenant_ids}")
+                return graph
+        except Exception as e:
+            logger.warning(f"Failed to load graph from cache: {e}")
+        return None
+    
+    async def _set_cached_graph(self, tenant_ids: List[str], graph: "nx.DiGraph"):
+        if not self.redis_client or not self.redis_client.is_connected:
+            return
+        
+        if not HAS_NETWORKX or json_graph is None:
+            return
+        
+        try:
+            key = self._cache_key(tenant_ids)
+            # Use JSON serialization instead of pickle for security
+            graph_data = json_graph.node_link_data(graph)
+            data = json.dumps(graph_data).encode("utf-8")
+            await self.redis_client.set(key, data, ttl=settings.GRAPH_CACHE_TTL)
+            logger.debug(f"Graph cached for tenants {tenant_ids}")
+        except Exception as e:
+            logger.warning(f"Failed to cache graph: {e}")
+    
+    async def invalidate_cache(self, tenant_ids: Optional[List[str]] = None):
+        if not self.redis_client or not self.redis_client.is_connected:
+            return
+        
+        try:
+            if tenant_ids:
+                key = self._cache_key(tenant_ids)
+                await self.redis_client.delete(key)
+                logger.info(f"Invalidated graph cache for tenants {tenant_ids}")
+            else:
+                pattern = f"{settings.GRAPH_CACHE_KEY_PREFIX}:*"
+                deleted = await self.redis_client.delete_pattern(pattern)
+                logger.info(f"Invalidated {deleted} graph cache entries")
+        except Exception as e:
+            logger.warning(f"Failed to invalidate cache: {e}")
+    
     async def load_graph(
         self,
         tenant_ids: List[str],
@@ -43,17 +104,24 @@ class GraphService:
         if self._graph is not None and not force_reload:
             return self._graph
         
+        if not force_reload:
+            cached = await self._get_cached_graph(tenant_ids)
+            if cached:
+                self._graph = cached
+                self._last_sync = datetime.utcnow()
+                return self._graph
+        
         self._graph = nx.DiGraph()
         
         nodes_result = await self.session.execute(
-            text("""
+            text(schema_sql("""
                 SELECT id, tenant_id, node_type, title, tags, dataset_name, 
                        field_path, status, graph_version
-                FROM agent.knowledge_nodes
+                FROM {schema}.knowledge_nodes
                 WHERE tenant_id = ANY(:tenant_ids) 
                   AND is_deleted = FALSE 
                   AND status = 'published'
-            """),
+            """)),
             {"tenant_ids": tenant_ids}
         )
         
@@ -73,11 +141,11 @@ class GraphService:
             return self._graph
         
         edges_result = await self.session.execute(
-            text("""
+            text(schema_sql("""
                 SELECT id, source_id, target_id, edge_type, weight, is_auto_generated
-                FROM agent.knowledge_edges
+                FROM {schema}.knowledge_edges
                 WHERE source_id = ANY(:node_ids) AND target_id = ANY(:node_ids)
-            """),
+            """)),
             {"node_ids": node_ids}
         )
         
@@ -92,6 +160,8 @@ class GraphService:
             )
         
         self._last_sync = datetime.utcnow()
+        
+        await self._set_cached_graph(tenant_ids, self._graph)
         
         return self._graph
     
@@ -206,6 +276,7 @@ class GraphService:
                 "orphan_nodes": 0,
                 "node_types": {},
                 "edge_types": {},
+                "cache_enabled": self.redis_client is not None and self.redis_client.is_connected,
             }
         
         undirected = self.graph.to_undirected()
@@ -237,6 +308,7 @@ class GraphService:
             "node_types": node_types,
             "edge_types": edge_types,
             "last_sync": self._last_sync.isoformat() if self._last_sync else None,
+            "cache_enabled": self.redis_client is not None and self.redis_client.is_connected,
         }
     
     async def find_orphan_nodes(

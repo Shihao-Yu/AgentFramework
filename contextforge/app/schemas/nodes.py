@@ -235,6 +235,7 @@ class NodeSearchResult(BaseModel):
     bm25_score: Optional[float] = None
     vector_score: Optional[float] = None
     rrf_score: float
+    match_source: Optional[str] = None
 
 
 class NodeSearchResponse(BaseModel):

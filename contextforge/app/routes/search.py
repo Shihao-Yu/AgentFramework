@@ -8,6 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_session
 from app.core.dependencies import get_embedding_client, get_current_user
+from app.core.rate_limit import rate_limit_dependency
+from app.core.config import settings
 from app.clients.embedding_client import EmbeddingClient
 from app.services.search_service import SearchService
 from app.schemas.search import SearchRequest, SearchResponse
@@ -23,6 +25,10 @@ async def search_knowledge(
     embedding_client: EmbeddingClient = Depends(get_embedding_client),
     current_user: str = Depends(get_current_user),
     x_session_id: Optional[str] = Header(None, alias="X-Session-ID"),
+    _rate_limit: None = Depends(rate_limit_dependency(
+        limit=settings.RATE_LIMIT_SEARCH_LIMIT,
+        window=settings.RATE_LIMIT_DEFAULT_WINDOW,
+    )),
 ):
     """
     Search knowledge base using hybrid search (BM25 + Vector).

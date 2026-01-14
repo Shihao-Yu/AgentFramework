@@ -44,13 +44,25 @@ async def main():
     from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
     from sqlalchemy.orm import sessionmaker
     from sqlalchemy import text
-    from app.clients.embedding_client import MockEmbeddingClient
+    from app.clients.embedding_client import EmbeddingClient
+    from contextforge.providers.embedding import MockEmbeddingProvider
+    
+    # Adapter to use library mock with app interface
+    class MockEmbeddingClientAdapter(EmbeddingClient):
+        def __init__(self):
+            self._provider = MockEmbeddingProvider()
+        
+        async def embed(self, text: str) -> list[float]:
+            return await self._provider.embed(text)
+        
+        async def embed_batch(self, texts: list[str]) -> list[list[float]]:
+            return await self._provider.embed_batch(texts)
     
     database_url = os.getenv("DATABASE_URL", "postgresql+asyncpg://localhost/contextforge")
     engine = create_async_engine(database_url)
     async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     
-    embedding_client = MockEmbeddingClient()
+    embedding_client = MockEmbeddingClientAdapter()
     
     async with async_session() as session:
         print("=" * 70)

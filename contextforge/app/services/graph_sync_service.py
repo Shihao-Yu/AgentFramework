@@ -12,6 +12,7 @@ from sqlalchemy import text
 
 from app.models.enums import EdgeType
 from app.clients.embedding_client import EmbeddingClient
+from app.utils.schema import sql as schema_sql
 
 
 class GraphSyncService:
@@ -29,13 +30,13 @@ class GraphSyncService:
     ) -> Dict[str, int]:
         """Process unprocessed events from graph_events table."""
         result = await self.session.execute(
-            text("""
+            text(schema_sql("""
                 SELECT id, event_type, entity_type, entity_id, payload, created_at
-                FROM agent.graph_events
+                FROM {schema}.graph_events
                 WHERE processed_at IS NULL
                 ORDER BY created_at ASC
                 LIMIT :batch_size
-            """),
+            """)),
             {"batch_size": batch_size}
         )
         
@@ -76,11 +77,11 @@ class GraphSyncService:
         
         if processed_ids:
             await self.session.execute(
-                text("""
-                    UPDATE agent.graph_events
+                text(schema_sql("""
+                    UPDATE {schema}.graph_events
                     SET processed_at = NOW()
                     WHERE id = ANY(:ids)
-                """),
+                """)),
                 {"ids": processed_ids}
             )
             await self.session.commit()
@@ -95,14 +96,14 @@ class GraphSyncService:
     ) -> int:
         """Generate SHARED_TAG edges between nodes with common tags."""
         await self.session.execute(
-            text("""
-                DELETE FROM agent.knowledge_edges
+            text(schema_sql("""
+                DELETE FROM {schema}.knowledge_edges
                 WHERE edge_type = 'shared_tag' AND is_auto_generated = TRUE
-            """)
+            """))
         )
         
         result = await self.session.execute(
-            text("""
+            text(schema_sql("""
                 WITH node_pairs AS (
                     SELECT 
                         n1.id as source_id,
@@ -111,8 +112,8 @@ class GraphSyncService:
                             ARRAY(SELECT unnest(n1.tags) INTERSECT SELECT unnest(n2.tags)),
                             1
                         ) as shared_count
-                    FROM agent.knowledge_nodes n1
-                    JOIN agent.knowledge_nodes n2 ON n1.id < n2.id
+                    FROM {schema}.knowledge_nodes n1
+                    JOIN {schema}.knowledge_nodes n2 ON n1.id < n2.id
                     WHERE n1.tenant_id = ANY(:tenant_ids)
                       AND n2.tenant_id = ANY(:tenant_ids)
                       AND n1.is_deleted = FALSE
@@ -121,7 +122,7 @@ class GraphSyncService:
                       AND n2.status = 'published'
                       AND n1.tags && n2.tags
                 )
-                INSERT INTO agent.knowledge_edges (source_id, target_id, edge_type, weight, is_auto_generated, created_by)
+                INSERT INTO {schema}.knowledge_edges (source_id, target_id, edge_type, weight, is_auto_generated, created_by)
                 SELECT 
                     source_id, 
                     target_id, 
@@ -135,7 +136,7 @@ class GraphSyncService:
                 ON CONFLICT (source_id, target_id, edge_type) DO UPDATE
                 SET weight = EXCLUDED.weight
                 RETURNING id
-            """),
+            """)),
             {
                 "tenant_ids": tenant_ids,
                 "min_shared_tags": min_shared_tags,
@@ -159,21 +160,21 @@ class GraphSyncService:
             return 0
         
         await self.session.execute(
-            text("""
-                DELETE FROM agent.knowledge_edges
+            text(schema_sql("""
+                DELETE FROM {schema}.knowledge_edges
                 WHERE edge_type = 'similar' AND is_auto_generated = TRUE
-            """)
+            """))
         )
         
         result = await self.session.execute(
-            text("""
+            text(schema_sql("""
                 WITH similar_pairs AS (
                     SELECT 
                         n1.id as source_id,
                         n2.id as target_id,
                         1 - (n1.embedding <=> n2.embedding) as similarity
-                    FROM agent.knowledge_nodes n1
-                    JOIN agent.knowledge_nodes n2 ON n1.id < n2.id
+                    FROM {schema}.knowledge_nodes n1
+                    JOIN {schema}.knowledge_nodes n2 ON n1.id < n2.id
                     WHERE n1.tenant_id = ANY(:tenant_ids)
                       AND n2.tenant_id = ANY(:tenant_ids)
                       AND n1.is_deleted = FALSE
@@ -184,7 +185,7 @@ class GraphSyncService:
                       AND n2.embedding IS NOT NULL
                       AND 1 - (n1.embedding <=> n2.embedding) >= :threshold
                 )
-                INSERT INTO agent.knowledge_edges (source_id, target_id, edge_type, weight, is_auto_generated, created_by)
+                INSERT INTO {schema}.knowledge_edges (source_id, target_id, edge_type, weight, is_auto_generated, created_by)
                 SELECT 
                     source_id, 
                     target_id, 
@@ -197,7 +198,7 @@ class GraphSyncService:
                 ON CONFLICT (source_id, target_id, edge_type) DO UPDATE
                 SET weight = EXCLUDED.weight
                 RETURNING id
-            """),
+            """)),
             {
                 "tenant_ids": tenant_ids,
                 "threshold": similarity_threshold,
@@ -213,31 +214,31 @@ class GraphSyncService:
     async def get_sync_status(self) -> Dict[str, Any]:
         """Get current sync status."""
         pending_result = await self.session.execute(
-            text("""
+            text(schema_sql("""
                 SELECT COUNT(*) as count
-                FROM agent.graph_events
+                FROM {schema}.graph_events
                 WHERE processed_at IS NULL
-            """)
+            """))
         )
         pending = pending_result.scalar() or 0
         
         last_processed_result = await self.session.execute(
-            text("""
+            text(schema_sql("""
                 SELECT MAX(processed_at) as last_processed
-                FROM agent.graph_events
+                FROM {schema}.graph_events
                 WHERE processed_at IS NOT NULL
-            """)
+            """))
         )
         row = last_processed_result.fetchone()
         last_processed = row.last_processed if row else None
         
         auto_edges_result = await self.session.execute(
-            text("""
+            text(schema_sql("""
                 SELECT edge_type, COUNT(*) as count
-                FROM agent.knowledge_edges
+                FROM {schema}.knowledge_edges
                 WHERE is_auto_generated = TRUE
                 GROUP BY edge_type
-            """)
+            """))
         )
         auto_edges = {row.edge_type: row.count for row in auto_edges_result.fetchall()}
         
@@ -253,12 +254,12 @@ class GraphSyncService:
     ) -> int:
         """Delete processed events older than specified days."""
         result = await self.session.execute(
-            text("""
-                DELETE FROM agent.graph_events
+            text(schema_sql("""
+                DELETE FROM {schema}.graph_events
                 WHERE processed_at IS NOT NULL
                   AND processed_at < NOW() - INTERVAL :days || ' days'
                 RETURNING id
-            """),
+            """)),
             {"days": str(days_to_keep)}
         )
         

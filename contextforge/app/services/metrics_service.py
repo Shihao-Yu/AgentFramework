@@ -3,14 +3,14 @@ Metrics and analytics service.
 """
 
 from datetime import datetime, timedelta
-from typing import List, Optional, Dict, Any
+from typing import List, Optional
 from sqlmodel import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 
-from app.models.knowledge import KnowledgeItem
-from app.models.analytics import KnowledgeHit
+from app.models.nodes import KnowledgeNode
 from app.models.enums import KnowledgeStatus
+from app.utils.schema import sql as schema_sql
 from app.schemas.metrics import (
     MetricsSummaryResponse,
     KnowledgeHitStats,
@@ -24,61 +24,64 @@ from app.schemas.metrics import (
 
 
 class MetricsService:
-    """Service for analytics and metrics."""
-    
-    def __init__(self, session: AsyncSession):
+    def __init__(self, session: AsyncSession, user_tenant_ids: List[str]):
         self.session = session
-    
+        self.user_tenant_ids = user_tenant_ids
+
     async def get_summary(self, days: int = 7) -> MetricsSummaryResponse:
-        """Get overall metrics summary."""
-        
-        # Count items by status
-        total_query = select(func.count(KnowledgeItem.id)).where(
-            KnowledgeItem.is_deleted == False
+        total_query = select(func.count(KnowledgeNode.id)).where(
+            KnowledgeNode.is_deleted == False,
+            KnowledgeNode.tenant_id.in_(self.user_tenant_ids),
         )
-        published_query = select(func.count(KnowledgeItem.id)).where(
-            KnowledgeItem.is_deleted == False,
-            KnowledgeItem.status == KnowledgeStatus.PUBLISHED
+        published_query = select(func.count(KnowledgeNode.id)).where(
+            KnowledgeNode.is_deleted == False,
+            KnowledgeNode.tenant_id.in_(self.user_tenant_ids),
+            KnowledgeNode.status == KnowledgeStatus.PUBLISHED,
         )
-        draft_query = select(func.count(KnowledgeItem.id)).where(
-            KnowledgeItem.is_deleted == False,
-            KnowledgeItem.status == KnowledgeStatus.DRAFT
+        draft_query = select(func.count(KnowledgeNode.id)).where(
+            KnowledgeNode.is_deleted == False,
+            KnowledgeNode.tenant_id.in_(self.user_tenant_ids),
+            KnowledgeNode.status == KnowledgeStatus.DRAFT,
         )
-        archived_query = select(func.count(KnowledgeItem.id)).where(
-            KnowledgeItem.is_deleted == False,
-            KnowledgeItem.status == KnowledgeStatus.ARCHIVED
+        archived_query = select(func.count(KnowledgeNode.id)).where(
+            KnowledgeNode.is_deleted == False,
+            KnowledgeNode.tenant_id.in_(self.user_tenant_ids),
+            KnowledgeNode.status == KnowledgeStatus.ARCHIVED,
         )
-        
+
         total = (await self.session.execute(total_query)).scalar() or 0
         published = (await self.session.execute(published_query)).scalar() or 0
         draft = (await self.session.execute(draft_query)).scalar() or 0
         archived = (await self.session.execute(archived_query)).scalar() or 0
-        
-        # Hit stats for period
+
         start_date = datetime.utcnow() - timedelta(days=days)
-        
-        hits_query = select(func.count(KnowledgeHit.id)).where(
-            KnowledgeHit.hit_at >= start_date
-        )
-        sessions_query = select(func.count(func.distinct(KnowledgeHit.session_id))).where(
-            KnowledgeHit.hit_at >= start_date
-        )
-        
-        total_hits = (await self.session.execute(hits_query)).scalar() or 0
-        total_sessions = (await self.session.execute(sessions_query)).scalar() or 0
-        
-        # Items never accessed
-        never_accessed_sql = text("""
-            SELECT COUNT(*) FROM agent.knowledge_items k
+
+        hits_stmt = text(schema_sql("""
+            SELECT COUNT(*) FROM {schema}.knowledge_hits
+            WHERE hit_at >= :start_date
+        """))
+        sessions_stmt = text(schema_sql("""
+            SELECT COUNT(DISTINCT session_id) FROM {schema}.knowledge_hits
+            WHERE hit_at >= :start_date
+        """))
+
+        total_hits = (await self.session.execute(hits_stmt, {"start_date": start_date})).scalar() or 0
+        total_sessions = (await self.session.execute(sessions_stmt, {"start_date": start_date})).scalar() or 0
+
+        never_accessed_stmt = text(schema_sql("""
+            SELECT COUNT(*) FROM {schema}.knowledge_nodes k
             WHERE k.is_deleted = FALSE
               AND k.status = 'published'
+              AND k.tenant_id = ANY(:tenant_ids)
               AND NOT EXISTS (
-                  SELECT 1 FROM agent.knowledge_hits h 
-                  WHERE h.knowledge_item_id = k.id
+                  SELECT 1 FROM {schema}.knowledge_hits h 
+                  WHERE h.node_id = k.id
               )
-        """)
-        never_accessed = (await self.session.execute(never_accessed_sql)).scalar() or 0
-        
+        """))
+        never_accessed = (await self.session.execute(
+            never_accessed_stmt, {"tenant_ids": self.user_tenant_ids}
+        )).scalar() or 0
+
         return MetricsSummaryResponse(
             total_items=total,
             published_items=published,
@@ -87,22 +90,20 @@ class MetricsService:
             total_hits=total_hits,
             total_sessions=total_sessions,
             avg_daily_sessions=total_sessions / days if days > 0 else 0,
-            never_accessed_count=never_accessed
+            never_accessed_count=never_accessed,
         )
     
     async def get_top_items(
         self,
         limit: int = 10,
-        days: int = 7
+        days: int = 7,
     ) -> TopItemsResponse:
-        """Get top performing items by hits."""
-        
         start_date = datetime.utcnow() - timedelta(days=days)
-        
-        sql = text("""
+
+        stmt = text(schema_sql("""
             SELECT 
                 k.id,
-                k.knowledge_type,
+                k.node_type,
                 k.title,
                 k.tags,
                 COUNT(h.id) AS total_hits,
@@ -111,25 +112,27 @@ class MetricsService:
                 MAX(h.hit_at) AS last_hit_at,
                 ROUND(AVG(h.similarity_score)::numeric, 3) AS avg_similarity,
                 MODE() WITHIN GROUP (ORDER BY h.retrieval_method) AS primary_retrieval_method
-            FROM agent.knowledge_items k
-            JOIN agent.knowledge_hits h ON k.id = h.knowledge_item_id
+            FROM {schema}.knowledge_nodes k
+            JOIN {schema}.knowledge_hits h ON k.id = h.node_id
             WHERE k.is_deleted = FALSE
+              AND k.tenant_id = ANY(:tenant_ids)
               AND h.hit_at >= :start_date
-            GROUP BY k.id, k.knowledge_type, k.title, k.tags
+            GROUP BY k.id, k.node_type, k.title, k.tags
             ORDER BY total_hits DESC
             LIMIT :limit
-        """)
-        
-        result = await self.session.execute(sql, {
+        """))
+
+        result = await self.session.execute(stmt, {
             "start_date": start_date,
-            "limit": limit
+            "limit": limit,
+            "tenant_ids": self.user_tenant_ids,
         })
-        
+
         items = []
         for row in result.fetchall():
             items.append(KnowledgeHitStats(
                 id=row.id,
-                knowledge_type=row.knowledge_type,
+                knowledge_type=row.node_type,
                 title=row.title,
                 tags=row.tags or [],
                 total_hits=row.total_hits,
@@ -137,9 +140,9 @@ class MetricsService:
                 days_with_hits=row.days_with_hits,
                 last_hit_at=row.last_hit_at,
                 avg_similarity=float(row.avg_similarity) if row.avg_similarity else None,
-                primary_retrieval_method=row.primary_retrieval_method
+                primary_retrieval_method=row.primary_retrieval_method,
             ))
-        
+
         return TopItemsResponse(items=items, period_days=days)
     
     async def get_daily_trend(self, days: int = 7) -> DailyTrendResponse:
@@ -147,18 +150,18 @@ class MetricsService:
         
         start_date = datetime.utcnow() - timedelta(days=days)
         
-        sql = text("""
+        stmt = text(schema_sql("""
             SELECT 
                 DATE(hit_at) AS date,
                 COUNT(*) AS total_hits,
                 COUNT(DISTINCT session_id) AS unique_sessions
-            FROM agent.knowledge_hits
+            FROM {schema}.knowledge_hits
             WHERE hit_at >= :start_date
             GROUP BY DATE(hit_at)
             ORDER BY date
-        """)
+        """))
         
-        result = await self.session.execute(sql, {"start_date": start_date})
+        result = await self.session.execute(stmt, {"start_date": start_date})
         
         data = []
         for row in result.fetchall():
@@ -171,61 +174,65 @@ class MetricsService:
         return DailyTrendResponse(data=data, period_days=days)
     
     async def get_tag_stats(self, limit: int = 20) -> TagStatsResponse:
-        """Get tag usage statistics."""
-        
-        sql = text("""
+        stmt = text(schema_sql("""
             SELECT 
                 unnest(k.tags) AS tag,
                 COUNT(*) AS count,
                 COALESCE(SUM(stats.total_hits), 0) AS total_hits
-            FROM agent.knowledge_items k
+            FROM {schema}.knowledge_nodes k
             LEFT JOIN (
-                SELECT knowledge_item_id, COUNT(*) AS total_hits
-                FROM agent.knowledge_hits
-                GROUP BY knowledge_item_id
-            ) stats ON k.id = stats.knowledge_item_id
+                SELECT node_id, COUNT(*) AS total_hits
+                FROM {schema}.knowledge_hits
+                GROUP BY node_id
+            ) stats ON k.id = stats.node_id
             WHERE k.is_deleted = FALSE
+              AND k.tenant_id = ANY(:tenant_ids)
             GROUP BY tag
             ORDER BY count DESC
             LIMIT :limit
-        """)
-        
-        result = await self.session.execute(sql, {"limit": limit})
-        
+        """))
+
+        result = await self.session.execute(stmt, {
+            "limit": limit,
+            "tenant_ids": self.user_tenant_ids,
+        })
+
         tags = []
         for row in result.fetchall():
             tags.append(TagStats(
                 tag=row.tag,
                 count=row.count,
-                total_hits=row.total_hits
+                total_hits=row.total_hits,
             ))
-        
-        # Get total unique tags
-        total_sql = text("""
+
+        total_stmt = text(schema_sql("""
             SELECT COUNT(DISTINCT unnest(tags)) 
-            FROM agent.knowledge_items 
+            FROM {schema}.knowledge_nodes 
             WHERE is_deleted = FALSE
-        """)
-        total = (await self.session.execute(total_sql)).scalar() or 0
-        
+              AND tenant_id = ANY(:tenant_ids)
+        """))
+        total = (await self.session.execute(total_stmt, {"tenant_ids": self.user_tenant_ids})).scalar() or 0
+
         return TagStatsResponse(tags=tags, total_tags=total)
-    
-    async def get_item_stats(
+
+    async def get_node_stats(
         self,
-        item_id: int,
-        days: int = 30
+        node_id: int,
+        days: int = 30,
     ) -> Optional[ItemStatsResponse]:
-        """Get detailed stats for a single item."""
-        
-        # Get item
-        item = await self.session.get(KnowledgeItem, item_id)
-        if not item or item.is_deleted:
+        query = select(KnowledgeNode).where(
+            KnowledgeNode.id == node_id,
+            KnowledgeNode.is_deleted == False,
+            KnowledgeNode.tenant_id.in_(self.user_tenant_ids),
+        )
+        result = await self.session.execute(query)
+        node = result.scalar_one_or_none()
+        if not node:
             return None
-        
+
         start_date = datetime.utcnow() - timedelta(days=days)
-        
-        # Aggregate stats
-        stats_sql = text("""
+
+        stats_stmt = text(schema_sql("""
             SELECT 
                 COUNT(*) AS total_hits,
                 COUNT(DISTINCT session_id) AS unique_sessions,
@@ -233,53 +240,52 @@ class MetricsService:
                 MIN(hit_at) AS first_hit,
                 MAX(hit_at) AS last_hit,
                 ROUND(AVG(similarity_score)::numeric, 3) AS avg_similarity
-            FROM agent.knowledge_hits
-            WHERE knowledge_item_id = :item_id
-        """)
-        
-        result = await self.session.execute(stats_sql, {"item_id": item_id})
-        row = result.fetchone()
-        
-        # Recent queries
-        queries_sql = text("""
-            SELECT DISTINCT query_text
-            FROM agent.knowledge_hits
-            WHERE knowledge_item_id = :item_id
+            FROM {schema}.knowledge_hits
+            WHERE node_id = :node_id
+        """))
+
+        stats_result = await self.session.execute(stats_stmt, {"node_id": node_id})
+        row = stats_result.fetchone()
+
+        queries_stmt = text(schema_sql("""
+            SELECT query_text
+            FROM {schema}.knowledge_hits
+            WHERE node_id = :node_id
               AND query_text IS NOT NULL
+            GROUP BY query_text
             ORDER BY MAX(hit_at) DESC
             LIMIT 10
-        """)
-        queries_result = await self.session.execute(queries_sql, {"item_id": item_id})
+        """))
+        queries_result = await self.session.execute(queries_stmt, {"node_id": node_id})
         queries = [r.query_text for r in queries_result.fetchall()]
-        
-        # Daily trend for this item
-        trend_sql = text("""
+
+        trend_stmt = text(schema_sql("""
             SELECT 
                 DATE(hit_at) AS date,
                 COUNT(*) AS total_hits,
                 COUNT(DISTINCT session_id) AS unique_sessions
-            FROM agent.knowledge_hits
-            WHERE knowledge_item_id = :item_id
+            FROM {schema}.knowledge_hits
+            WHERE node_id = :node_id
               AND hit_at >= :start_date
             GROUP BY DATE(hit_at)
             ORDER BY date
-        """)
-        trend_result = await self.session.execute(trend_sql, {
-            "item_id": item_id,
-            "start_date": start_date
+        """))
+        trend_result = await self.session.execute(trend_stmt, {
+            "node_id": node_id,
+            "start_date": start_date,
         })
-        
+
         hit_trend = []
         for tr in trend_result.fetchall():
             hit_trend.append(DailyHitStats(
                 date=tr.date.isoformat(),
                 total_hits=tr.total_hits,
-                unique_sessions=tr.unique_sessions
+                unique_sessions=tr.unique_sessions,
             ))
-        
+
         return ItemStatsResponse(
-            item_id=item_id,
-            title=item.title,
+            item_id=node_id,
+            title=node.title,
             total_hits=row.total_hits or 0,
             unique_sessions=row.unique_sessions or 0,
             days_with_hits=row.days_with_hits or 0,
@@ -287,5 +293,5 @@ class MetricsService:
             last_hit=row.last_hit,
             avg_similarity=float(row.avg_similarity) if row.avg_similarity else None,
             queries=queries,
-            hit_trend=hit_trend
+            hit_trend=hit_trend,
         )

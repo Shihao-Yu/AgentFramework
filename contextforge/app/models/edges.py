@@ -9,11 +9,14 @@ from sqlalchemy import Column, String, BigInteger
 from sqlalchemy.dialects.postgresql import JSONB
 
 from app.models.enums import EdgeType
+from app.utils.schema import get_schema
+
+_SCHEMA = get_schema()
 
 
 class KnowledgeEdge(SQLModel, table=True):
     __tablename__ = "knowledge_edges"
-    __table_args__ = {"schema": "agent"}
+    __table_args__ = {"schema": _SCHEMA}
     
     id: Optional[int] = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
     source_id: int = Field(sa_column=Column(BigInteger, nullable=False))

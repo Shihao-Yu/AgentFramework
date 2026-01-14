@@ -3,32 +3,6 @@ Pydantic schemas for API request/response validation.
 """
 
 from app.schemas.common import PaginatedResponse, SuccessResponse, ErrorResponse
-from app.schemas.knowledge import (
-    KnowledgeListParams,
-    KnowledgeItemCreate,
-    KnowledgeItemUpdate,
-    KnowledgeItemResponse,
-    KnowledgeItemDetailResponse,
-    VariantCreate,
-    VariantResponse,
-    RelationshipCreate,
-    RelationshipResponse,
-    RelatedItemResponse,
-    CategoryCreate,
-    CategoryUpdate,
-    CategoryResponse,
-    CategoryTreeResponse,
-    VersionResponse,
-)
-from app.schemas.staging import (
-    StagingListParams,
-    StagingReviewRequest,
-    StagingEditRequest,
-    StagingItemResponse,
-    StagingCountsResponse,
-    StagingListResponse,
-    StagingReviewResponse,
-)
 from app.schemas.search import (
     SearchRequest,
     SearchResult,
@@ -102,42 +76,15 @@ from app.schemas.context import (
 )
 
 __all__ = [
-    # Common
     "PaginatedResponse",
     "SuccessResponse",
     "ErrorResponse",
-    # Knowledge
-    "KnowledgeListParams",
-    "KnowledgeItemCreate",
-    "KnowledgeItemUpdate",
-    "KnowledgeItemResponse",
-    "KnowledgeItemDetailResponse",
-    "VariantCreate",
-    "VariantResponse",
-    "RelationshipCreate",
-    "RelationshipResponse",
-    "RelatedItemResponse",
-    "CategoryCreate",
-    "CategoryUpdate",
-    "CategoryResponse",
-    "CategoryTreeResponse",
-    "VersionResponse",
-    # Staging
-    "StagingListParams",
-    "StagingReviewRequest",
-    "StagingEditRequest",
-    "StagingItemResponse",
-    "StagingCountsResponse",
-    "StagingListResponse",
-    "StagingReviewResponse",
-    # Search
     "SearchRequest",
     "SearchResult",
     "SearchResponse",
     "ContextSearchRequest",
     "ContextItem",
     "ContextSearchResponse",
-    # Metrics
     "MetricsSummaryResponse",
     "TypeDistribution",
     "StatusDistribution",
@@ -148,13 +95,11 @@ __all__ = [
     "TagStats",
     "TagStatsResponse",
     "ItemStatsResponse",
-    # Settings
     "SearchSettings",
     "PipelineSettings",
     "MaintenanceSettings",
     "SettingsResponse",
     "SettingsUpdateRequest",
-    # Knowledge Verse Nodes
     "FAQContent",
     "PlaybookContent",
     "PermissionRuleContent",
@@ -171,14 +116,12 @@ __all__ = [
     "NodeSearchResult",
     "NodeSearchResponse",
     "NodeVersionResponse",
-    # Knowledge Verse Edges
     "EdgeCreate",
     "EdgeBulkCreate",
     "EdgeUpdate",
     "EdgeResponse",
     "EdgeListParams",
     "EdgeListResponse",
-    # Knowledge Verse Tenants
     "TenantCreate",
     "TenantUpdate",
     "TenantResponse",
@@ -187,7 +130,6 @@ __all__ = [
     "UserTenantAccessUpdate",
     "UserTenantAccessResponse",
     "UserTenantsResponse",
-    # Knowledge Verse Context
     "ContextRequest",
     "ContextResponse",
     "EntryPointResult",

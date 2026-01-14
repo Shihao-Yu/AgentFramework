@@ -19,12 +19,25 @@ from app.schemas.nodes import (
 )
 from app.schemas.common import PaginatedResponse
 from app.clients.embedding_client import EmbeddingClient
+from app.utils.schema import sql
+
+
+class EmbeddingClientRequiredError(RuntimeError):
+    pass
 
 
 class NodeService:
-    def __init__(self, session: AsyncSession, embedding_client: EmbeddingClient):
+    def __init__(self, session: AsyncSession, embedding_client: Optional[EmbeddingClient] = None):
         self.session = session
         self.embedding_client = embedding_client
+    
+    def _require_embedding_client(self) -> EmbeddingClient:
+        if self.embedding_client is None:
+            raise EmbeddingClientRequiredError(
+                "Embedding client required for this operation. "
+                "Set OPENAI_API_KEY or install sentence-transformers."
+            )
+        return self.embedding_client
     
     async def list_nodes(
         self,
@@ -116,8 +129,9 @@ class NodeService:
         if data.tenant_id not in user_tenant_ids:
             return None
         
+        client = self._require_embedding_client()
         embed_text = self._build_embed_text(data.title, data.content, data.node_type)
-        embedding = await self.embedding_client.embed(embed_text)
+        embedding = await client.embed(embed_text)
         
         node = KnowledgeNode(
             tenant_id=data.tenant_id,
@@ -140,11 +154,11 @@ class NodeService:
         await self.session.flush()
         
         await self.session.execute(
-            text("""
-                UPDATE agent.knowledge_nodes 
+            text(sql("""
+                UPDATE {schema}.knowledge_nodes 
                 SET embedding = :embedding::vector 
                 WHERE id = :id
-            """),
+            """)),
             {"id": node.id, "embedding": embedding}
         )
         
@@ -180,15 +194,16 @@ class NodeService:
         await self.session.flush()
         
         if content_changed:
+            client = self._require_embedding_client()
             embed_text = self._build_embed_text(node.title, node.content, node.node_type)
-            embedding = await self.embedding_client.embed(embed_text)
+            embedding = await client.embed(embed_text)
             
             await self.session.execute(
-                text("""
-                    UPDATE agent.knowledge_nodes 
+                text(sql("""
+                    UPDATE {schema}.knowledge_nodes 
                     SET embedding = :embedding::vector 
                     WHERE id = :id
-                """),
+                """)),
                 {"id": node.id, "embedding": embedding}
             )
         
@@ -227,12 +242,13 @@ class NodeService:
         if not query_text or not query_text.strip():
             return []
         
-        query_embedding = await self.embedding_client.embed(query_text)
+        client = self._require_embedding_client()
+        query_embedding = await client.embed(query_text)
         embedding_str = "[" + ",".join(str(x) for x in query_embedding) + "]"
         
         result = await self.session.execute(
-            text("""
-                SELECT * FROM agent.hybrid_search_nodes(
+            text(sql("""
+                SELECT * FROM {schema}.hybrid_search_nodes(
                     :query_text,
                     :query_embedding,
                     :tenant_ids,
@@ -242,7 +258,7 @@ class NodeService:
                     :vector_weight,
                     :result_limit
                 )
-            """),
+            """)),
             {
                 "query_text": query_text,
                 "query_embedding": embedding_str,
@@ -276,6 +292,7 @@ class NodeService:
                 created_at=datetime.utcnow(),
             )
             
+            match_source = getattr(row, 'match_source', None)
             results.append(NodeSearchResult(
                 node=node_response,
                 bm25_rank=row.bm25_rank,
@@ -283,6 +300,7 @@ class NodeService:
                 bm25_score=row.bm25_score,
                 vector_score=row.vector_score,
                 rrf_score=row.rrf_score,
+                match_source=match_source,
             ))
         
         return results
@@ -314,14 +332,14 @@ class NodeService:
             return []
         
         result = await self.session.execute(
-            text("""
+            text(sql("""
                 SELECT id, node_id, version_number, title, content, tags, 
                        change_type, changed_by, changed_at
-                FROM agent.node_versions
+                FROM {schema}.node_versions
                 WHERE node_id = :node_id
                 ORDER BY version_number DESC
                 LIMIT :limit
-            """),
+            """)),
             {"node_id": node_id, "limit": limit}
         )
         

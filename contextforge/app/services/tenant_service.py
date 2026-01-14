@@ -18,6 +18,7 @@ from app.schemas.tenant import (
     UserTenantAccessUpdate,
     UserTenantAccessResponse,
 )
+from app.utils.schema import sql as schema_sql
 
 
 class TenantService:
@@ -116,12 +117,12 @@ class TenantService:
     
     async def get_user_tenants(self, user_id: str) -> List[str]:
         result = await self.session.execute(
-            text("""
+            text(schema_sql("""
                 SELECT uta.tenant_id 
-                FROM agent.user_tenant_access uta
-                JOIN agent.tenants t ON uta.tenant_id = t.id
+                FROM {schema}.user_tenant_access uta
+                JOIN {schema}.tenants t ON uta.tenant_id = t.id
                 WHERE uta.user_id = :user_id AND t.is_active = TRUE
-            """),
+            """)),
             {"user_id": user_id}
         )
         return [row.tenant_id for row in result.fetchall()]
@@ -131,14 +132,14 @@ class TenantService:
         user_id: str,
     ) -> List[UserTenantAccessResponse]:
         result = await self.session.execute(
-            text("""
+            text(schema_sql("""
                 SELECT uta.user_id, uta.tenant_id, uta.role, uta.granted_at, 
                        uta.granted_by, t.name as tenant_name
-                FROM agent.user_tenant_access uta
-                JOIN agent.tenants t ON uta.tenant_id = t.id
+                FROM {schema}.user_tenant_access uta
+                JOIN {schema}.tenants t ON uta.tenant_id = t.id
                 WHERE uta.user_id = :user_id AND t.is_active = TRUE
                 ORDER BY t.name
-            """),
+            """)),
             {"user_id": user_id}
         )
         
@@ -256,20 +257,20 @@ class TenantService:
     
     async def _get_tenant_node_count(self, tenant_id: str) -> int:
         result = await self.session.execute(
-            text("""
-                SELECT COUNT(*) FROM agent.knowledge_nodes 
+            text(schema_sql("""
+                SELECT COUNT(*) FROM {schema}.knowledge_nodes 
                 WHERE tenant_id = :tenant_id AND is_deleted = FALSE
-            """),
+            """)),
             {"tenant_id": tenant_id}
         )
         return result.scalar() or 0
     
     async def _get_tenant_user_count(self, tenant_id: str) -> int:
         result = await self.session.execute(
-            text("""
-                SELECT COUNT(DISTINCT user_id) FROM agent.user_tenant_access 
+            text(schema_sql("""
+                SELECT COUNT(DISTINCT user_id) FROM {schema}.user_tenant_access 
                 WHERE tenant_id = :tenant_id
-            """),
+            """)),
             {"tenant_id": tenant_id}
         )
         return result.scalar() or 0

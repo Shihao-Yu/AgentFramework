@@ -4,16 +4,12 @@ Metrics and analytics request/response schemas.
 
 from datetime import datetime
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
-from app.models.enums import KnowledgeType
+from app.models.enums import NodeType
 
-
-# ==================== Summary Stats ====================
 
 class MetricsSummaryResponse(BaseModel):
-    """Response schema for overall metrics summary."""
-    
     total_items: int
     published_items: int
     draft_items: int
@@ -25,28 +21,20 @@ class MetricsSummaryResponse(BaseModel):
 
 
 class TypeDistribution(BaseModel):
-    """Distribution of items by type."""
-    
-    type: KnowledgeType
+    type: str
     count: int
     percentage: float
 
 
 class StatusDistribution(BaseModel):
-    """Distribution of items by status."""
-    
     status: str
     count: int
     percentage: float
 
 
-# ==================== Hit Stats ====================
-
 class KnowledgeHitStats(BaseModel):
-    """Hit statistics for a knowledge item."""
-    
     id: int
-    knowledge_type: KnowledgeType
+    knowledge_type: str
     title: str
     tags: List[str]
     total_hits: int

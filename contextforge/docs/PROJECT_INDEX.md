@@ -1,7 +1,7 @@
 # ContextForge Project Index
 
-**Version:** 1.0  
-**Last Updated:** January 13, 2026
+**Version:** 1.1  
+**Last Updated:** January 14, 2026
 
 ---
 
@@ -103,13 +103,17 @@ ContextForge is a **Knowledge Verse** system designed for AI agent context manag
 
 | Document | Description | Status |
 |----------|-------------|--------|
-| [QUICKSTART.md](QUICKSTART.md) | Getting started guide with examples | Planned |
-| [API_REFERENCE.md](API_REFERENCE.md) | Complete API endpoint documentation | Planned |
-| [RETRIEVAL_DESIGN.md](RETRIEVAL_DESIGN.md) | Hybrid search architecture and algorithms | Planned |
-| [SCHEMA_ONBOARDING.md](SCHEMA_ONBOARDING.md) | Dataset onboarding workflow and examples | Planned |
-| [FEATURES_ARCHITECTURE.md](FEATURES_ARCHITECTURE.md) | Feature overview and system architecture | Planned |
-| [COMPLETE_WORKFLOW.md](COMPLETE_WORKFLOW.md) | End-to-end workflow examples | Planned |
-| [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) | Developer reference and contribution guide | Planned |
+| [QUICKSTART.md](QUICKSTART.md) | Getting started guide with examples | Complete |
+| [API_REFERENCE.md](API_REFERENCE.md) | Complete API endpoint documentation | Complete |
+| [RETRIEVAL_DESIGN.md](RETRIEVAL_DESIGN.md) | Hybrid search architecture and algorithms | Complete |
+| [SCHEMA_ONBOARDING.md](SCHEMA_ONBOARDING.md) | Dataset onboarding workflow and examples | Complete |
+| [FEATURES_ARCHITECTURE.md](FEATURES_ARCHITECTURE.md) | Feature overview and system architecture | Complete |
+| [COMPLETE_WORKFLOW.md](COMPLETE_WORKFLOW.md) | End-to-end workflow examples | Complete |
+| [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) | Developer reference and contribution guide | Complete |
+| [QUERY_GENERATION.md](QUERY_GENERATION.md) | How NL-to-SQL query generation works | Complete |
+| [CONTEXT_RAG.md](CONTEXT_RAG.md) | Context assembly pipeline for AI agents | Complete |
+| [INTEGRATION_GUIDE.md](INTEGRATION_GUIDE.md) | How to integrate ContextForge as a library | Complete |
+| [LIBRARY_DESIGN.md](LIBRARY_DESIGN.md) | Library architecture and design decisions | Complete |
 
 ### Additional Resources
 

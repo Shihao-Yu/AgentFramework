@@ -4,17 +4,21 @@ FAQ/Knowledge Base System - FastAPI Application
 Main application entry point.
 """
 
+import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.core.config import settings
+from app.core.dependencies import (
+    EmbeddingClientNotConfiguredError,
+    InferenceClientNotConfiguredError,
+)
+from app.services.node_service import EmbeddingClientRequiredError
+from app.core.logging import setup_logging
 from app.routes import (
-    knowledge_router,
-    staging_router,
-    search_router,
-    metrics_router,
-    settings_router,
     nodes_router,
     edges_router,
     tenants_router,
@@ -22,17 +26,23 @@ from app.routes import (
     context_router,
     sync_router,
     datasets_router,
+    search_router,
+    metrics_router,
+    settings_router,
+    health_router,
+    onboarding_router,
 )
+
+
+setup_logging()
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan handler."""
-    # Startup
-    print(f"Starting {settings.APP_NAME}...")
+    logger.info(f"Starting {settings.APP_NAME}...")
     yield
-    # Shutdown
-    print(f"Shutting down {settings.APP_NAME}...")
+    logger.info(f"Shutting down {settings.APP_NAME}...")
 
 
 app = FastAPI(
@@ -88,14 +98,6 @@ app.add_middleware(
 )
 
 
-# Include routers (legacy)
-app.include_router(knowledge_router, prefix="/api")
-app.include_router(staging_router, prefix="/api")
-app.include_router(search_router, prefix="/api")
-app.include_router(metrics_router, prefix="/api")
-app.include_router(settings_router, prefix="/api")
-
-# Include routers (Knowledge Verse)
 app.include_router(nodes_router, prefix="/api")
 app.include_router(edges_router, prefix="/api")
 app.include_router(tenants_router, prefix="/api")
@@ -103,23 +105,54 @@ app.include_router(graph_router, prefix="/api")
 app.include_router(context_router, prefix="/api")
 app.include_router(sync_router, prefix="/api")
 app.include_router(datasets_router, prefix="/api")
+app.include_router(search_router, prefix="/api")
+app.include_router(metrics_router, prefix="/api")
+app.include_router(settings_router, prefix="/api")
+app.include_router(onboarding_router, prefix="/api")
+app.include_router(health_router)
 
 
-@app.get("/", tags=["health"])
+@app.exception_handler(EmbeddingClientNotConfiguredError)
+async def embedding_not_configured_handler(request: Request, exc: EmbeddingClientNotConfiguredError):
+    logger.warning(f"Embedding service not configured: {request.url.path}")
+    return JSONResponse(
+        status_code=503,
+        content={
+            "detail": "Embedding service not configured",
+            "help": "Set OPENAI_API_KEY or install sentence-transformers",
+        },
+    )
+
+
+@app.exception_handler(InferenceClientNotConfiguredError)
+async def inference_not_configured_handler(request: Request, exc: InferenceClientNotConfiguredError):
+    logger.warning(f"LLM service not configured: {request.url.path}")
+    return JSONResponse(
+        status_code=503,
+        content={
+            "detail": "LLM service not configured",
+            "help": "Set OPENAI_API_KEY environment variable",
+        },
+    )
+
+
+@app.exception_handler(EmbeddingClientRequiredError)
+async def embedding_required_handler(request: Request, exc: EmbeddingClientRequiredError):
+    logger.warning(f"Embedding client required: {request.url.path}")
+    return JSONResponse(
+        status_code=503,
+        content={
+            "detail": "Embedding service required for this operation",
+            "help": "Set OPENAI_API_KEY or install sentence-transformers",
+        },
+    )
+
+
+@app.get("/", tags=["root"])
 async def root():
-    """Root endpoint - health check."""
     return {
-        "status": "healthy",
         "app": settings.APP_NAME,
-        "version": "1.0.0"
-    }
-
-
-@app.get("/health", tags=["health"])
-async def health_check():
-    """Detailed health check endpoint."""
-    return {
-        "status": "healthy",
-        "database": "connected",  # TODO: Add actual DB health check
-        "embedding_service": "available",  # TODO: Add actual service check
+        "version": "1.0.0",
+        "docs": "/docs",
+        "health": "/health/ready",
     }

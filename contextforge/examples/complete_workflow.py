@@ -137,8 +137,20 @@ async def run_workflow(database_url: Optional[str] = None) -> None:
     from sqlalchemy.orm import sessionmaker
     
     from app.services.queryforge_service import QueryForgeService
-    from app.clients.embedding_client import MockEmbeddingClient
-    from app.clients.inference_client import MockInferenceClient
+    from app.clients.embedding_client import EmbeddingClient
+    from contextforge.providers.embedding import MockEmbeddingProvider
+    from contextforge.providers.llm import MockLLMProvider
+    
+    # Adapter to use library mock with app interface
+    class MockEmbeddingClientAdapter(EmbeddingClient):
+        def __init__(self):
+            self._provider = MockEmbeddingProvider()
+        
+        async def embed(self, text: str) -> list[float]:
+            return await self._provider.embed(text)
+        
+        async def embed_batch(self, texts: list[str]) -> list[list[float]]:
+            return await self._provider.embed_batch(texts)
     
     # Database setup
     db_url = database_url or os.getenv(
@@ -166,10 +178,10 @@ async def run_workflow(database_url: Optional[str] = None) -> None:
     )
     
     async with async_session_factory() as session:
-        # Initialize clients
-        # Note: Replace with real clients for production use
-        embedding_client = MockEmbeddingClient()
-        llm_client = MockInferenceClient()
+        # Initialize providers
+        # Note: Replace with real providers for production use
+        embedding_client = MockEmbeddingClientAdapter()
+        llm_client = MockLLMProvider()
         
         # Initialize the QueryForge service
         service = QueryForgeService(
@@ -397,10 +409,9 @@ Summary:
   - Queries tested: {len(SAMPLE_QUESTIONS)}
 
 Next Steps:
-  1. Replace MockEmbeddingClient with a real embedding service
-  2. Replace MockInferenceClient with a real LLM service
-  3. Add more domain-specific examples for better query generation
-  4. Enable schema enrichment for automatic metadata extraction
+  1. Set OPENAI_API_KEY for real embedding and LLM services
+  2. Add more domain-specific examples for better query generation
+  3. Enable schema enrichment for automatic metadata extraction
 """)
     
     # Close engine

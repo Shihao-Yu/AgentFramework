@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_session
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_current_user, get_graph_service
 from app.services.graph_service import GraphService
 from app.services.tenant_service import TenantService
 
@@ -72,10 +72,10 @@ async def get_user_tenant_ids(
 async def get_graph_stats(
     session: AsyncSession = Depends(get_session),
     current_user: str = Depends(get_current_user),
+    service: GraphService = Depends(get_graph_service),
 ):
     user_tenant_ids = await get_user_tenant_ids(session, current_user)
     
-    service = GraphService(session)
     stats = await service.get_graph_stats(user_tenant_ids)
     
     return GraphStatsResponse(**stats)
@@ -88,10 +88,10 @@ async def get_neighbors(
     edge_types: Optional[List[str]] = Query(None),
     session: AsyncSession = Depends(get_session),
     current_user: str = Depends(get_current_user),
+    service: GraphService = Depends(get_graph_service),
 ):
     user_tenant_ids = await get_user_tenant_ids(session, current_user)
     
-    service = GraphService(session)
     neighbors = await service.get_neighbors(
         node_id, user_tenant_ids, depth, edge_types
     )
@@ -106,10 +106,10 @@ async def find_paths(
     max_depth: int = Query(5, ge=1, le=10),
     session: AsyncSession = Depends(get_session),
     current_user: str = Depends(get_current_user),
+    service: GraphService = Depends(get_graph_service),
 ):
     user_tenant_ids = await get_user_tenant_ids(session, current_user)
     
-    service = GraphService(session)
     paths = await service.find_paths(
         source_id, target_id, user_tenant_ids, max_depth
     )
@@ -122,10 +122,10 @@ async def get_connected_component(
     node_id: int,
     session: AsyncSession = Depends(get_session),
     current_user: str = Depends(get_current_user),
+    service: GraphService = Depends(get_graph_service),
 ):
     user_tenant_ids = await get_user_tenant_ids(session, current_user)
     
-    service = GraphService(session)
     component = await service.get_connected_component(node_id, user_tenant_ids)
     
     return component
@@ -135,10 +135,10 @@ async def get_connected_component(
 async def find_orphan_nodes(
     session: AsyncSession = Depends(get_session),
     current_user: str = Depends(get_current_user),
+    service: GraphService = Depends(get_graph_service),
 ):
     user_tenant_ids = await get_user_tenant_ids(session, current_user)
     
-    service = GraphService(session)
     orphans = await service.find_orphan_nodes(user_tenant_ids)
     
     return [NeighborResponse(depth=0, **o) for o in orphans]
@@ -150,10 +150,10 @@ async def suggest_connections(
     limit: int = Query(5, ge=1, le=20),
     session: AsyncSession = Depends(get_session),
     current_user: str = Depends(get_current_user),
+    service: GraphService = Depends(get_graph_service),
 ):
     user_tenant_ids = await get_user_tenant_ids(session, current_user)
     
-    service = GraphService(session)
     suggestions = await service.suggest_connections(
         node_id, user_tenant_ids, limit
     )
@@ -165,10 +165,10 @@ async def suggest_connections(
 async def reload_graph(
     session: AsyncSession = Depends(get_session),
     current_user: str = Depends(get_current_user),
+    service: GraphService = Depends(get_graph_service),
 ):
     user_tenant_ids = await get_user_tenant_ids(session, current_user)
     
-    service = GraphService(session)
     service.clear_cache()
     await service.load_graph(user_tenant_ids, force_reload=True)
     stats = await service.get_graph_stats(user_tenant_ids)

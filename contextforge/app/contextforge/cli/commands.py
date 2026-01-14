@@ -10,6 +10,7 @@ Provides Click-based commands for:
 
 import asyncio
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Optional
@@ -17,6 +18,8 @@ from typing import Optional
 import click
 
 from ..schema.yaml_schema import SchemaType
+
+DB_SCHEMA = os.environ.get("DB_SCHEMA", "agent")
 
 
 def run_async(coro):
@@ -454,11 +457,11 @@ def test_retrieval(ctx, dataset_name: str, question: str, top_k: int, strategy: 
         async with get_async_session() as session:
             # First check what nodes exist for this dataset
             result = await session.execute(
-                text("""
+                text(f"""
                     SELECT id, title, field_path, data_type, content, 
                            embedding IS NOT NULL as has_embedding,
                            search_vector IS NOT NULL as has_search_vector
-                    FROM agent.knowledge_nodes 
+                    FROM {DB_SCHEMA}.knowledge_nodes 
                     WHERE tenant_id = :tenant_id
                     AND dataset_name = :dataset_name
                     AND node_type = 'schema_field'
@@ -494,7 +497,7 @@ def test_retrieval(ctx, dataset_name: str, question: str, top_k: int, strategy: 
             if effective_strategy == "keyword":
                 # BM25 keyword search only
                 result = await session.execute(
-                    text("""
+                    text(f"""
                         SELECT 
                             n.id,
                             n.title,
@@ -502,7 +505,7 @@ def test_retrieval(ctx, dataset_name: str, question: str, top_k: int, strategy: 
                             n.data_type,
                             n.content,
                             ts_rank_cd(n.search_vector, plainto_tsquery('english', :query)) as bm25_score
-                        FROM agent.knowledge_nodes n
+                        FROM {DB_SCHEMA}.knowledge_nodes n
                         WHERE n.tenant_id = :tenant_id
                         AND n.dataset_name = :dataset_name
                         AND n.node_type = 'schema_field'
@@ -613,13 +616,13 @@ def test_retrieval(ctx, dataset_name: str, question: str, top_k: int, strategy: 
                 
                 # Use keyword search for examples too
                 result = await session.execute(
-                    text("""
+                    text(f"""
                         SELECT 
                             n.id,
                             n.title,
                             n.content,
                             ts_rank_cd(n.search_vector, plainto_tsquery('english', :query)) as score
-                        FROM agent.knowledge_nodes n
+                        FROM {DB_SCHEMA}.knowledge_nodes n
                         WHERE n.tenant_id = :tenant_id
                         AND n.dataset_name = :dataset_name
                         AND n.node_type = 'example'

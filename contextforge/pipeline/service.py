@@ -14,12 +14,12 @@ from typing import List, Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 
-from app.models.staging import StagingKnowledgeItem
-from app.models.knowledge import KnowledgeVariant
-from app.models.enums import KnowledgeType, StagingStatus, StagingAction
+from app.models.nodes import NodeVariant
+from app.models.enums import NodeType, StagingStatus, StagingAction, VariantSource
 from app.clients.embedding_client import EmbeddingClient
 from app.clients.inference_client import InferenceClient
 from app.services.search_service import SearchService
+from app.utils.schema import sql as schema_sql
 
 from pipeline.models import (
     TicketData,
@@ -399,36 +399,34 @@ class TicketPipeline:
     
     async def _add_variant(
         self,
-        knowledge_item_id: int,
+        node_id: int,
         analysis: AnalysisResult,
-        ticket: TicketData
+        ticket: TicketData,
     ) -> int:
-        """Add a question variant to an existing knowledge item."""
-        
-        # Generate embedding
         embedding = await self.embedding_client.embed(analysis.question)
-        
-        variant = KnowledgeVariant(
-            knowledge_item_id=knowledge_item_id,
+
+        variant = NodeVariant(
+            node_id=node_id,
             variant_text=analysis.question,
-            source="pipeline",
+            source=VariantSource.PIPELINE,
             source_reference=ticket.ticket_id,
             created_by="pipeline",
         )
-        
+
         self.session.add(variant)
         await self.session.flush()
-        
-        # Set embedding
+
+        from app.utils.schema import get_schema
+        schema = get_schema()
         await self.session.execute(
-            text("""
-                UPDATE agent.knowledge_variants 
+            text(f"""
+                UPDATE {schema}.node_variants 
                 SET embedding = :embedding::vector 
                 WHERE id = :id
             """),
             {"id": variant.id, "embedding": embedding}
         )
-        
+
         return variant.id
     
     async def _create_staging_item(
@@ -437,73 +435,54 @@ class TicketPipeline:
         ticket: TicketData,
         decision: PipelineDecision,
         merge_target_id: Optional[int],
-        merge_reasoning: Optional[str]
+        merge_reasoning: Optional[str],
+        tenant_id: str = "default",
     ) -> int:
-        """Create a staging item for review."""
-        
-        # Determine action
-        if decision == PipelineDecision.NEW:
-            action = StagingAction.NEW
-        else:
-            action = StagingAction.MERGE
-        
-        # Map knowledge type
-        knowledge_type_map = {
-            "faq": KnowledgeType.FAQ,
-            "troubleshooting": KnowledgeType.TROUBLESHOOTING,
-            "procedure": KnowledgeType.PROCEDURE,
-            "business_rule": KnowledgeType.BUSINESS_RULE,
-            "how_to": KnowledgeType.FAQ,  # Map how_to to FAQ
+        action = StagingAction.NEW if decision == PipelineDecision.NEW else StagingAction.MERGE
+
+        node_type_map = {
+            "faq": NodeType.FAQ,
+            "troubleshooting": NodeType.FAQ,
+            "procedure": NodeType.PLAYBOOK,
+            "business_rule": NodeType.CONCEPT,
+            "how_to": NodeType.FAQ,
         }
-        knowledge_type = knowledge_type_map.get(
-            analysis.knowledge_type, KnowledgeType.FAQ
-        )
-        
-        # Build content
+        node_type = node_type_map.get(analysis.knowledge_type, NodeType.FAQ)
+
         content = {
             "question": analysis.question,
             "answer": analysis.answer,
         }
         if analysis.summary:
             content["summary"] = analysis.summary
-        
-        # Generate embedding
-        embed_text = f"{analysis.title}\n{analysis.question}\n{analysis.answer}"
-        embedding = await self.embedding_client.embed(embed_text)
-        
-        staging = StagingKnowledgeItem(
-            knowledge_type=knowledge_type,
-            title=analysis.title,
-            summary=analysis.summary,
-            content=content,
-            tags=analysis.suggested_tags,
-            source_ticket_id=ticket.ticket_id,
-            source_type=ticket.source,
-            confidence=analysis.confidence,
-            status=StagingStatus.PENDING,
-            action=action,
-            merge_with_id=merge_target_id,
-            similarity=ticket.raw_data.get("top_similarity") if ticket.raw_data else None,
-            metadata_={
-                "ticket_subject": ticket.subject,
-                "ticket_category": ticket.category,
-                "merge_reasoning": merge_reasoning,
-                "processed_at": datetime.utcnow().isoformat(),
-            },
-            created_by="pipeline",
+
+        result = await self.session.execute(
+            text(schema_sql("""
+                INSERT INTO {schema}.staging_nodes (
+                    tenant_id, node_type, title, content, tags,
+                    status, action, target_node_id, similarity,
+                    source, source_reference, confidence, created_by
+                ) VALUES (
+                    :tenant_id, :node_type, :title, :content::jsonb, :tags,
+                    :status, :action, :target_node_id, :similarity,
+                    :source, :source_reference, :confidence, :created_by
+                ) RETURNING id
+            """)),
+            {
+                "tenant_id": tenant_id,
+                "node_type": node_type.value,
+                "title": analysis.title,
+                "content": json.dumps(content),
+                "tags": analysis.suggested_tags,
+                "status": StagingStatus.PENDING.value,
+                "action": action.value,
+                "target_node_id": merge_target_id,
+                "similarity": ticket.raw_data.get("top_similarity") if ticket.raw_data else None,
+                "source": ticket.source,
+                "source_reference": ticket.ticket_id,
+                "confidence": analysis.confidence,
+                "created_by": "pipeline",
+            }
         )
-        
-        self.session.add(staging)
-        await self.session.flush()
-        
-        # Set embedding
-        await self.session.execute(
-            text("""
-                UPDATE agent.staging_knowledge_items 
-                SET embedding = :embedding::vector 
-                WHERE id = :id
-            """),
-            {"id": staging.id, "embedding": embedding}
-        )
-        
-        return staging.id
+
+        return result.scalar_one()

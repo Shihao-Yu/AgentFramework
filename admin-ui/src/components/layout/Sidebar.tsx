@@ -15,6 +15,7 @@ import {
   Package,
   Lightbulb,
   Activity,
+  Upload,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -41,6 +42,7 @@ const navigation: NavItem[] = [
   { name: 'Playbooks', href: '/playbooks', icon: BookMarked },
   { name: 'Entities', href: '/entities', icon: Package },
   { name: 'Concepts', href: '/concepts', icon: Lightbulb },
+  { name: 'Content Onboarding', href: '/onboarding', icon: Upload },
   { name: 'Staging Queue', href: '/staging', icon: Inbox, badge: 5 },
   { name: 'Usage Analytics', href: '/analytics', icon: BarChart3 },
   { name: 'Graph Health', href: '/graph-analytics', icon: Activity },
