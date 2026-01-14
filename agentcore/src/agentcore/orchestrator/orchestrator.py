@@ -4,7 +4,7 @@ import asyncio
 import json
 import logging
 import time
-from typing import AsyncIterator, Optional
+from typing import AsyncIterator, Optional, Protocol
 
 import httpx
 
@@ -21,12 +21,8 @@ from agentcore.settings.orchestrator import OrchestratorSettings
 logger = logging.getLogger(__name__)
 
 
-class InferenceClient:
-    """Simple inference client interface."""
-
-    async def complete(self, messages: list[dict]) -> str:
-        """Complete a chat and return response content."""
-        raise NotImplementedError
+class InferenceClientProtocol(Protocol):
+    async def complete(self, messages: list[dict]) -> str: ...
 
 
 class Orchestrator:
@@ -43,7 +39,7 @@ class Orchestrator:
     def __init__(
         self,
         registry: RegistryClient,
-        inference: Optional[InferenceClient] = None,
+        inference: Optional[InferenceClientProtocol] = None,
         settings: Optional[OrchestratorSettings] = None,
     ):
         self._registry = registry

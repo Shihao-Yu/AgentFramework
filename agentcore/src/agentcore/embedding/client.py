@@ -25,7 +25,7 @@ class EmbeddingClient:
         client = EmbeddingClient(settings)
         
         vector = await client.embed("Hello, world!")
-        print(vector.shape)  # (1536,)
+        # vector.shape => (1536,)
         ```
     """
 

@@ -3,7 +3,7 @@
 import json
 import struct
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Protocol
 
 import numpy as np
 from redis.asyncio import Redis
@@ -16,12 +16,8 @@ from agentcore.registry.models import AgentInfo
 from agentcore.settings.registry import RegistrySettings
 
 
-class EmbeddingClient:
-    """Simple embedding client interface."""
-
-    async def embed(self, text: str) -> np.ndarray:
-        """Embed text and return vector."""
-        raise NotImplementedError
+class EmbeddingClientProtocol(Protocol):
+    async def embed(self, text: str) -> np.ndarray: ...
 
 
 class RegistryClient:
@@ -30,7 +26,7 @@ class RegistryClient:
     def __init__(
         self,
         redis: Redis,
-        embedding: EmbeddingClient,
+        embedding: EmbeddingClientProtocol,
         settings: Optional[RegistrySettings] = None,
     ):
         self._redis = redis

@@ -115,18 +115,18 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["contextforge", "app", "pipeline", "jobs"]
+packages = ["src/contextforge", "src/app", "src/pipeline", "src/jobs"]
 
 [tool.hatch.build.targets.wheel.shared-data]
-"contextforge/admin" = "share/contextforge/admin"
+"src/contextforge/admin" = "share/contextforge/admin"
 
 [tool.hatch.build]
 include = [
-    "contextforge/**/*.py",
-    "contextforge/admin/**/*",
-    "app/**/*.py",
-    "pipeline/**/*.py",
-    "jobs/**/*.py",
+    "src/contextforge/**/*.py",
+    "src/contextforge/admin/**/*",
+    "src/app/**/*.py",
+    "src/pipeline/**/*.py",
+    "src/jobs/**/*.py",
 ]
 
 [tool.ruff]
@@ -178,13 +178,14 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+pythonpath = ["src"]
 filterwarnings = [
     "ignore::DeprecationWarning",
 ]
 addopts = "-v --tb=short"
 
 [tool.coverage.run]
-source = ["app", "pipeline", "jobs"]
+source = ["src/app", "src/pipeline", "src/jobs"]
 branch = true
 omit = ["*/tests/*", "*/__init__.py"]
 
