@@ -10,45 +10,45 @@ export interface KnowledgeNodeData extends Record<string, unknown> {
   summary?: string
   tags: string[]
   isSearchMatch?: boolean
-  isEdgeCreationMode?: boolean
-  isPendingSource?: boolean
 }
 
 export type KnowledgeNodeType = Node<KnowledgeNodeData, 'knowledge'>
 
+const handleClassName = cn(
+  '!w-3 !h-3 !bg-muted-foreground/50 !border-2 !border-background',
+  'hover:!bg-blue-500 hover:!scale-150',
+  'transition-all duration-150'
+)
+
 function KnowledgeNodeComponent({ data, selected }: NodeProps<KnowledgeNodeType>) {
   const nodeData = data as KnowledgeNodeData
   const config = NodeTypeConfig[nodeData.nodeType]
-  const isSource = nodeData.isPendingSource
 
   return (
     <>
-      <Handle type="target" position={Position.Top} className="!bg-muted-foreground" />
+      <Handle 
+        type="target" 
+        position={Position.Top} 
+        className={handleClassName}
+      />
       <div
         className={cn(
           'min-w-[180px] max-w-[220px] rounded-lg border-2 px-3 py-2 shadow-md transition-all',
-          selected && !nodeData.isEdgeCreationMode && 'ring-2 ring-primary ring-offset-2',
-          nodeData.isSearchMatch && 'ring-2 ring-yellow-400',
-          nodeData.isEdgeCreationMode && !isSource && 'cursor-pointer hover:ring-2 hover:ring-green-400 hover:scale-105 hover:border-green-500',
-          isSource && 'ring-4 ring-blue-500 ring-offset-2 scale-110 border-blue-500 shadow-xl'
+          selected && 'ring-2 ring-primary ring-offset-2',
+          nodeData.isSearchMatch && 'ring-2 ring-yellow-400'
         )}
         style={{
-          backgroundColor: isSource ? '#dbeafe' : config.bgColor,
-          borderColor: isSource ? '#3b82f6' : config.color,
+          backgroundColor: config.bgColor,
+          borderColor: config.color,
         }}
       >
-        {isSource && (
-          <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-blue-500 text-white text-xs px-2 py-0.5 rounded-full whitespace-nowrap font-medium">
-            Source Node
-          </div>
-        )}
         <div className="flex items-center gap-2">
           <span className="text-lg" role="img" aria-label={nodeData.nodeType}>
             {config.icon}
           </span>
           <span
             className="flex-1 truncate text-sm font-medium"
-            style={{ color: isSource ? '#1e40af' : config.color }}
+            style={{ color: config.color }}
           >
             {nodeData.title}
           </span>
@@ -76,7 +76,11 @@ function KnowledgeNodeComponent({ data, selected }: NodeProps<KnowledgeNodeType>
           </div>
         )}
       </div>
-      <Handle type="source" position={Position.Bottom} className="!bg-muted-foreground" />
+      <Handle 
+        type="source" 
+        position={Position.Bottom} 
+        className={handleClassName}
+      />
     </>
   )
 }

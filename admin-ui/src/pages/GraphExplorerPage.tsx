@@ -33,7 +33,6 @@ export function GraphExplorerPage() {
   
   const [addNodeModalOpen, setAddNodeModalOpen] = useState(false)
   const [addEdgeDialogOpen, setAddEdgeDialogOpen] = useState(false)
-  const [edgeCreationMode, setEdgeCreationMode] = useState(false)
   const [pendingEdgeSource, setPendingEdgeSource] = useState<number | null>(null)
   const [pendingEdgeTarget, setPendingEdgeTarget] = useState<number | null>(null)
 
@@ -126,7 +125,6 @@ export function GraphExplorerPage() {
     await createEdge(data)
     setPendingEdgeSource(null)
     setPendingEdgeTarget(null)
-    setEdgeCreationMode(false)
     await loadAllNodes()
   }, [createEdge, loadAllNodes])
 
@@ -136,7 +134,7 @@ export function GraphExplorerPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Knowledge Graph Explorer</h1>
           <p className="text-sm text-muted-foreground">
-            Visualize and explore relationships between knowledge nodes
+            Visualize and explore relationships between knowledge nodes. Drag from one node's handle to another to create edges.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -179,10 +177,6 @@ export function GraphExplorerPage() {
                   searchMatches={searchMatches}
                   onNodeSelect={selectNode}
                   onNodeDoubleClick={handleNodeDoubleClick}
-                  edgeCreationMode={edgeCreationMode}
-                  onEdgeCreationModeChange={setEdgeCreationMode}
-                  pendingEdgeSource={pendingEdgeSource}
-                  onPendingEdgeSourceChange={setPendingEdgeSource}
                   onEdgeCreate={handleEdgeCreate}
                   className="h-full w-full"
                 />

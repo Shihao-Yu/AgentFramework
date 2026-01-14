@@ -32,10 +32,10 @@ async def get_user_tenant_ids(
     tenant_service = TenantService(session)
     tenants = await tenant_service.get_user_tenants(user_id)
     if not tenants:
-        tenants = ["default", "shared"]
-    else:
-        if "shared" not in tenants:
-            tenants.append("shared")
+        all_tenants = await tenant_service.list_tenants()
+        tenants = [t.id for t in all_tenants]
+    if "shared" not in tenants:
+        tenants.append("shared")
     return tenants
 
 
@@ -101,7 +101,13 @@ async def create_edge(
     user_tenant_ids = await get_user_tenant_ids(session, current_user)
     
     service = EdgeService(session)
-    edge = await service.create_edge(data, user_tenant_ids, created_by=current_user)
+    try:
+        edge = await service.create_edge(data, user_tenant_ids, created_by=current_user)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(e)
+        )
     
     if not edge:
         raise HTTPException(

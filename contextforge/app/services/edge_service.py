@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import List, Optional, Tuple
 from sqlmodel import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy import text
 
 from app.models.edges import KnowledgeEdge
@@ -165,6 +166,22 @@ class EdgeService:
         if source_tenant not in user_tenant_ids and target_tenant not in user_tenant_ids:
             return None
         
+        existing = await self.session.execute(
+            text("""
+                SELECT id FROM agent.knowledge_edges
+                WHERE source_id = :source_id 
+                  AND target_id = :target_id 
+                  AND edge_type = :edge_type
+            """),
+            {
+                "source_id": data.source_id,
+                "target_id": data.target_id,
+                "edge_type": data.edge_type.value,
+            }
+        )
+        if existing.fetchone():
+            raise ValueError("Edge already exists")
+        
         edge = KnowledgeEdge(
             source_id=data.source_id,
             target_id=data.target_id,
@@ -176,8 +193,12 @@ class EdgeService:
         )
         
         self.session.add(edge)
-        await self.session.commit()
-        await self.session.refresh(edge)
+        try:
+            await self.session.commit()
+            await self.session.refresh(edge)
+        except IntegrityError:
+            await self.session.rollback()
+            raise ValueError("Edge already exists")
         
         return edge
     

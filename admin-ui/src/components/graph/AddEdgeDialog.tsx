@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ArrowRight } from 'lucide-react'
+import { ArrowLeftRight } from 'lucide-react'
 
 import {
   Dialog,
@@ -51,27 +51,32 @@ export function AddEdgeDialog({
 }: AddEdgeDialogProps) {
   const [edgeType, setEdgeType] = useState<EdgeType>(EdgeType.RELATED)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isSwapped, setIsSwapped] = useState(false)
 
   if (!sourceNode || !targetNode) return null
+
+  const displaySource = isSwapped ? targetNode : sourceNode
+  const displayTarget = isSwapped ? sourceNode : targetNode
 
   const handleSubmit = async () => {
     setIsSubmitting(true)
     try {
       await onSubmit({
-        source_id: sourceNode.id,
-        target_id: targetNode.id,
+        source_id: displaySource.id,
+        target_id: displayTarget.id,
         edge_type: edgeType,
         weight: 1.0,
       })
       setEdgeType(EdgeType.RELATED)
+      setIsSwapped(false)
       onOpenChange(false)
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  const sourceConfig = NodeTypeConfig[sourceNode.node_type]
-  const targetConfig = NodeTypeConfig[targetNode.node_type]
+  const sourceConfig = NodeTypeConfig[displaySource.node_type]
+  const targetConfig = NodeTypeConfig[displayTarget.node_type]
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -88,17 +93,26 @@ export function AddEdgeDialog({
             <div className="flex flex-col items-center gap-2 p-3 border rounded-lg bg-muted/50 flex-1">
               <span className="text-2xl">{sourceConfig.icon}</span>
               <span className="text-sm font-medium text-center line-clamp-2">
-                {sourceNode.title}
+                {displaySource.title}
               </span>
               <Badge variant="outline" className="text-xs">Source</Badge>
             </div>
             
-            <ArrowRight className="h-6 w-6 text-muted-foreground shrink-0" />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsSwapped(!isSwapped)}
+              title="Swap source and target"
+              className="shrink-0"
+            >
+              <ArrowLeftRight className="h-5 w-5" />
+            </Button>
             
             <div className="flex flex-col items-center gap-2 p-3 border rounded-lg bg-muted/50 flex-1">
               <span className="text-2xl">{targetConfig.icon}</span>
               <span className="text-sm font-medium text-center line-clamp-2">
-                {targetNode.title}
+                {displayTarget.title}
               </span>
               <Badge variant="outline" className="text-xs">Target</Badge>
             </div>

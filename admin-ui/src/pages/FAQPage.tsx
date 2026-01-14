@@ -11,7 +11,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { FAQDataTable, FAQFormDialog } from '@/components/faq'
-import { MarkdownPreview } from '@/components/editors'
 import { useFAQs } from '@/hooks/useFAQ'
 import type { FAQItem, FAQFormData } from '@/types/knowledge'
 
@@ -21,7 +20,6 @@ export function FAQPage() {
   const [editingItem, setEditingItem] = useState<FAQItem | null>(null)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [itemToDelete, setItemToDelete] = useState<FAQItem | null>(null)
-  const [viewItem, setViewItem] = useState<FAQItem | null>(null)
 
   const handleCreate = useCallback(() => {
     setEditingItem(null)
@@ -31,10 +29,6 @@ export function FAQPage() {
   const handleEdit = useCallback((item: FAQItem) => {
     setEditingItem(item)
     setFormOpen(true)
-  }, [])
-
-  const handleView = useCallback((item: FAQItem) => {
-    setViewItem(item)
   }, [])
 
   const handleDeleteClick = useCallback((item: FAQItem) => {
@@ -61,14 +55,12 @@ export function FAQPage() {
     [editingItem, createItem, updateItem]
   )
 
-  // Stats
   const totalCount = items.length
   const publishedCount = items.filter((i) => i.status === 'published').length
   const draftCount = items.filter((i) => i.status === 'draft').length
 
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">FAQs</h1>
@@ -82,7 +74,6 @@ export function FAQPage() {
         </Button>
       </div>
 
-      {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -110,25 +101,22 @@ export function FAQPage() {
         </Card>
       </div>
 
-      {/* Data Table */}
       <Card>
         <CardHeader>
           <CardTitle>All FAQs</CardTitle>
           <CardDescription>
-            Click on a row to view details or use the actions menu.
+            Manage your FAQ entries. Click edit to modify or delete to remove.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <FAQDataTable
             data={items}
-            onView={handleView}
             onEdit={handleEdit}
             onDelete={handleDeleteClick}
           />
         </CardContent>
       </Card>
 
-      {/* Create/Edit Dialog */}
       <FAQFormDialog
         open={formOpen}
         onOpenChange={setFormOpen}
@@ -136,63 +124,6 @@ export function FAQPage() {
         onSubmit={handleFormSubmit}
       />
 
-      {/* View Dialog */}
-      <Dialog open={!!viewItem} onOpenChange={() => setViewItem(null)}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-auto">
-          <DialogHeader>
-            <DialogTitle>{viewItem?.title}</DialogTitle>
-            <DialogDescription>
-              Last updated:{' '}
-              {viewItem?.updated_at
-                ? new Date(viewItem.updated_at).toLocaleDateString()
-                : 'Never'}
-            </DialogDescription>
-          </DialogHeader>
-          {viewItem && (
-            <div className="space-y-4">
-              <div>
-                <h4 className="font-medium mb-1">Question</h4>
-                <p className="text-muted-foreground">{viewItem.content.question}</p>
-              </div>
-              <div>
-                <h4 className="font-medium mb-1">Answer</h4>
-                <div className="border rounded-md p-4 bg-muted/30">
-                  <MarkdownPreview content={viewItem.content.answer} />
-                </div>
-              </div>
-              {viewItem.tags.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {viewItem.tags.map((tag) => (
-                    <span
-                      key={tag}
-                      className="px-2 py-1 bg-secondary text-secondary-foreground rounded text-sm"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setViewItem(null)}>
-              Close
-            </Button>
-            <Button
-              onClick={() => {
-                if (viewItem) {
-                  handleEdit(viewItem)
-                  setViewItem(null)
-                }
-              }}
-            >
-              Edit
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Confirmation Dialog */}
       <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
         <DialogContent>
           <DialogHeader>

@@ -10,11 +10,11 @@ import {
   type Node,
   type Edge,
   type NodeMouseHandler,
+  type Connection,
   ConnectionLineType,
   MarkerType,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { Link2, X } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { KnowledgeNode, type KnowledgeNodeData } from './nodes/KnowledgeNode'
@@ -36,19 +36,13 @@ export interface GraphCanvasProps {
   searchMatches?: number[]
   onNodeSelect?: (nodeId: number | null) => void
   onNodeDoubleClick?: (nodeId: number) => void
-  edgeCreationMode?: boolean
-  onEdgeCreationModeChange?: (enabled: boolean) => void
-  pendingEdgeSource?: number | null
-  onPendingEdgeSourceChange?: (nodeId: number | null) => void
   onEdgeCreate?: (sourceId: number, targetId: number) => void
   className?: string
 }
 
 function transformToReactFlowNodes(
   graphNodes: GraphNode[],
-  searchMatches: number[] = [],
-  edgeCreationMode: boolean = false,
-  pendingEdgeSource: number | null = null
+  searchMatches: number[] = []
 ): Node<KnowledgeNodeData>[] {
   const searchMatchSet = new Set(searchMatches)
   
@@ -63,8 +57,6 @@ function transformToReactFlowNodes(
       summary: node.summary,
       tags: node.tags,
       isSearchMatch: searchMatchSet.has(node.id),
-      isEdgeCreationMode: edgeCreationMode,
-      isPendingSource: pendingEdgeSource === node.id,
     },
   }))
 }
@@ -93,18 +85,14 @@ export function GraphCanvasCore({
   searchMatches = [],
   onNodeSelect,
   onNodeDoubleClick,
-  edgeCreationMode = false,
-  onEdgeCreationModeChange,
-  pendingEdgeSource = null,
-  onPendingEdgeSourceChange,
   onEdgeCreate,
   className,
 }: GraphCanvasProps) {
   const [layoutDirection, setLayoutDirection] = useState<LayoutDirection>('TB')
 
   const initialNodes = useMemo(
-    () => transformToReactFlowNodes(graphNodes, searchMatches, edgeCreationMode, pendingEdgeSource),
-    [graphNodes, searchMatches, edgeCreationMode, pendingEdgeSource]
+    () => transformToReactFlowNodes(graphNodes, searchMatches),
+    [graphNodes, searchMatches]
   )
 
   const initialEdges = useMemo(
@@ -128,23 +116,20 @@ export function GraphCanvasCore({
     setEdges(layoutedEdges)
   }, [layoutedEdges, setEdges])
 
+  const handleConnect = useCallback(
+    (connection: Connection) => {
+      if (connection.source && connection.target && connection.source !== connection.target) {
+        onEdgeCreate?.(Number(connection.source), Number(connection.target))
+      }
+    },
+    [onEdgeCreate]
+  )
+
   const handleNodeClick: NodeMouseHandler = useCallback(
     (_, node) => {
-      const nodeId = Number(node.id)
-      
-      if (edgeCreationMode) {
-        if (pendingEdgeSource === null) {
-          onPendingEdgeSourceChange?.(nodeId)
-        } else if (pendingEdgeSource !== nodeId) {
-          onEdgeCreate?.(pendingEdgeSource, nodeId)
-          onPendingEdgeSourceChange?.(null)
-        }
-        return
-      }
-      
-      onNodeSelect?.(nodeId)
+      onNodeSelect?.(Number(node.id))
     },
-    [edgeCreationMode, pendingEdgeSource, onNodeSelect, onPendingEdgeSourceChange, onEdgeCreate]
+    [onNodeSelect]
   )
 
   const handleNodeDoubleClick: NodeMouseHandler = useCallback(
@@ -155,12 +140,8 @@ export function GraphCanvasCore({
   )
 
   const handlePaneClick = useCallback(() => {
-    if (edgeCreationMode) {
-      onPendingEdgeSourceChange?.(null)
-      return
-    }
     onNodeSelect?.(null)
-  }, [edgeCreationMode, onNodeSelect, onPendingEdgeSourceChange])
+  }, [onNodeSelect])
 
   const handleLayout = useCallback(
     (direction: LayoutDirection) => {
@@ -183,12 +164,14 @@ export function GraphCanvasCore({
         edges={edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
+        onConnect={handleConnect}
         onNodeClick={handleNodeClick}
         onNodeDoubleClick={handleNodeDoubleClick}
         onPaneClick={handlePaneClick}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         connectionLineType={ConnectionLineType.SmoothStep}
+        connectionLineStyle={{ stroke: '#3b82f6', strokeWidth: 2 }}
         fitView
         fitViewOptions={{ padding: 0.2 }}
         minZoom={0.1}
@@ -205,18 +188,6 @@ export function GraphCanvasCore({
         />
         <Panel position="top-right" className="flex gap-1">
           <Button
-            variant={edgeCreationMode ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => {
-              onEdgeCreationModeChange?.(!edgeCreationMode)
-              onPendingEdgeSourceChange?.(null)
-            }}
-            className={edgeCreationMode ? 'bg-blue-600 hover:bg-blue-700' : ''}
-          >
-            <Link2 className="h-4 w-4 mr-1" />
-            {edgeCreationMode ? 'Linking...' : 'Link'}
-          </Button>
-          <Button
             variant={layoutDirection === 'TB' ? 'default' : 'outline'}
             size="sm"
             onClick={() => handleLayout('TB')}
@@ -231,34 +202,6 @@ export function GraphCanvasCore({
             Horizontal
           </Button>
         </Panel>
-        {edgeCreationMode && (
-          <Panel position="top-center" className="flex items-center gap-3 bg-blue-600 text-white px-4 py-2.5 rounded-lg shadow-lg">
-            <Link2 className="h-5 w-5" />
-            <div className="flex flex-col">
-              <span className="text-sm font-semibold">
-                {pendingEdgeSource 
-                  ? 'Step 2: Click the target node' 
-                  : 'Step 1: Click the source node'}
-              </span>
-              <span className="text-xs opacity-80">
-                {pendingEdgeSource 
-                  ? 'Select where the connection should go' 
-                  : 'Select where the connection starts from'}
-              </span>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 w-7 p-0 hover:bg-blue-700 text-white ml-2"
-              onClick={() => {
-                onEdgeCreationModeChange?.(false)
-                onPendingEdgeSourceChange?.(null)
-              }}
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </Panel>
-        )}
       </ReactFlow>
     </div>
   )

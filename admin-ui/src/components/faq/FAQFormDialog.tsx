@@ -91,7 +91,7 @@ export function FAQFormDialog({
   const addTag = useCallback(() => {
     const tag = tagInput.trim().toLowerCase()
     if (tag && !form.getValues('tags').includes(tag)) {
-      form.setValue('tags', [...form.getValues('tags'), tag])
+      form.setValue('tags', [...form.getValues('tags'), tag], { shouldDirty: true })
     }
     setTagInput('')
   }, [tagInput, form])
@@ -100,7 +100,8 @@ export function FAQFormDialog({
     (tagToRemove: string) => {
       form.setValue(
         'tags',
-        form.getValues('tags').filter((t) => t !== tagToRemove)
+        form.getValues('tags').filter((t) => t !== tagToRemove),
+        { shouldDirty: true }
       )
     },
     [form]
@@ -165,7 +166,7 @@ export function FAQFormDialog({
               </Label>
               <MarkdownEditor
                 value={answer}
-                onChange={(val) => form.setValue('answer', val)}
+                onChange={(val) => form.setValue('answer', val, { shouldDirty: true })}
                 placeholder="Provide a clear, detailed answer... (Markdown supported)"
                 height={250}
               />
@@ -183,7 +184,7 @@ export function FAQFormDialog({
                 <Select
                   value={form.watch('status')}
                   onValueChange={(value: FAQFormData['status']) =>
-                    form.setValue('status', value)
+                    form.setValue('status', value, { shouldDirty: true })
                   }
                 >
                   <SelectTrigger>
@@ -202,7 +203,7 @@ export function FAQFormDialog({
                 <Select
                   value={form.watch('visibility')}
                   onValueChange={(value: FAQFormData['visibility']) =>
-                    form.setValue('visibility', value)
+                    form.setValue('visibility', value, { shouldDirty: true })
                   }
                 >
                   <SelectTrigger>
@@ -258,17 +259,15 @@ export function FAQFormDialog({
 
         <DialogFooter className="pt-4 border-t">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            {isEditing && !form.formState.isDirty ? 'Close' : 'Cancel'}
+            Cancel
           </Button>
-          {(!isEditing || form.formState.isDirty) && (
-            <Button
-              onClick={form.handleSubmit(handleSubmit)}
-              disabled={isSubmitting}
-            >
-              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isEditing ? 'Save Changes' : 'Create FAQ'}
-            </Button>
-          )}
+          <Button
+            onClick={form.handleSubmit(handleSubmit)}
+            disabled={isSubmitting || (isEditing && !form.formState.isDirty)}
+          >
+            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isEditing ? 'Save Changes' : 'Create FAQ'}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

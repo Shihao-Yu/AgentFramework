@@ -228,12 +228,13 @@ class NodeService:
             return []
         
         query_embedding = await self.embedding_client.embed(query_text)
+        embedding_str = "[" + ",".join(str(x) for x in query_embedding) + "]"
         
         result = await self.session.execute(
             text("""
                 SELECT * FROM agent.hybrid_search_nodes(
                     :query_text,
-                    :query_embedding::vector,
+                    :query_embedding,
                     :tenant_ids,
                     :node_types,
                     :tag_filter,
@@ -244,7 +245,7 @@ class NodeService:
             """),
             {
                 "query_text": query_text,
-                "query_embedding": query_embedding,
+                "query_embedding": embedding_str,
                 "tenant_ids": user_tenant_ids,
                 "node_types": [nt.value for nt in node_types] if node_types else None,
                 "tag_filter": tags,

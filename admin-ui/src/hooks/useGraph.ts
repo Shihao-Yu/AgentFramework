@@ -97,6 +97,80 @@ export function useGraph() {
     setError(null)
 
     try {
+      // If no query, load nodes directly from /api/nodes
+      if (!request.query || !request.query.trim()) {
+        const params: Record<string, string | number | string[] | undefined> = {
+          limit: request.limit || 100,
+          page: 1,
+        }
+        if (request.tenant_ids && request.tenant_ids.length > 0) {
+          params.tenant_ids = request.tenant_ids
+        }
+        if (request.node_types && request.node_types.length > 0) {
+          params.node_types = request.node_types
+        }
+
+        const nodesResponse = await apiRequest<{ data: KnowledgeNode[]; total: number }>(
+          '/api/nodes',
+          { params }
+        )
+
+        const graphNodes: GraphNode[] = nodesResponse.data.map(n => ({
+          id: n.id,
+          tenant_id: n.tenant_id,
+          node_type: n.node_type as NodeType,
+          title: n.title,
+          summary: n.summary,
+          content: n.content,
+          tags: n.tags,
+          visibility: n.visibility,
+          status: n.status,
+          created_at: n.created_at,
+        }))
+
+        // Fetch edges for all loaded nodes
+        const nodeIds = graphNodes.map(n => n.id)
+        const graphEdges: GraphEdge[] = []
+        
+        if (nodeIds.length > 0) {
+          const edgesResponse = await apiRequest<{ edges: Array<{ id: number; source_id: number; target_id: number; edge_type: EdgeType; weight: number }> }>(
+            '/api/edges',
+            { params: { limit: 500 } }
+          )
+          
+          const nodeIdSet = new Set(nodeIds)
+          edgesResponse.edges.forEach(edge => {
+            if (nodeIdSet.has(edge.source_id) && nodeIdSet.has(edge.target_id)) {
+              graphEdges.push({
+                source: edge.source_id,
+                target: edge.target_id,
+                edge_type: edge.edge_type,
+                weight: edge.weight,
+              })
+            }
+          })
+        }
+
+        setNodes(graphNodes)
+        setEdges(graphEdges)
+        setSearchMatches([])
+
+        const byType: Partial<Record<NodeType, number>> = {}
+        graphNodes.forEach(n => {
+          byType[n.node_type] = (byType[n.node_type] || 0) + 1
+        })
+
+        return {
+          nodes: graphNodes,
+          edges: graphEdges,
+          search_matches: [],
+          stats: {
+            total_nodes: graphNodes.length,
+            by_type: byType,
+          },
+        }
+      }
+
       // Use the context API for search with graph expansion
       const contextRequest: ContextRequest = {
         query: request.query || '',
@@ -140,24 +214,37 @@ export function useGraph() {
       const graphNodes = Array.from(nodeMap.values())
       const matchedIds = response.entry_points.map(ep => ep.id)
 
-      // Build edges from context paths
+      const nodeIds = graphNodes.map(n => n.id)
       const graphEdges: GraphEdge[] = []
-      response.context.forEach(cn => {
-        if (cn.path && cn.path.length >= 2) {
-          const sourceId = cn.path[cn.path.length - 2]
-          const targetId = cn.path[cn.path.length - 1]
-          
-          // Avoid duplicates
-          if (!graphEdges.some(e => e.source === sourceId && e.target === targetId)) {
-            graphEdges.push({
-              source: sourceId,
-              target: targetId,
-              edge_type: cn.edge_type || 'related',
-              weight: 1.0,
-            })
-          }
-        }
-      })
+      
+      if (nodeIds.length > 0) {
+        const edgePromises = nodeIds.map(nodeId =>
+          apiRequest<{ edges: Array<{ id: number; source_id: number; target_id: number; edge_type: EdgeType; weight: number }> }>('/api/edges', {
+            params: { node_id: nodeId, limit: 100 },
+          }).catch(() => ({ edges: [] }))
+        )
+        
+        const edgeResponses = await Promise.all(edgePromises)
+        const seenEdges = new Set<string>()
+        const nodeIdSet = new Set(nodeIds)
+        
+        edgeResponses.forEach(response => {
+          response.edges.forEach(edge => {
+            if (nodeIdSet.has(edge.source_id) && nodeIdSet.has(edge.target_id)) {
+              const edgeKey = `${edge.source_id}-${edge.target_id}`
+              if (!seenEdges.has(edgeKey)) {
+                seenEdges.add(edgeKey)
+                graphEdges.push({
+                  source: edge.source_id,
+                  target: edge.target_id,
+                  edge_type: edge.edge_type,
+                  weight: edge.weight,
+                })
+              }
+            }
+          })
+        })
+      }
 
       // Filter implicit edges if requested
       let finalEdges = graphEdges

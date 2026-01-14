@@ -1,14 +1,14 @@
 [project]
-name = "faq-knowledge-base"
+name = "contextforge"
 version = "1.0.0"
-description = "FAQ/Knowledge Base System with hybrid search and automated ticket-to-knowledge conversion"
+description = "Knowledge Management Library for FastAPI - Hybrid search, knowledge graphs, and NL-to-SQL query generation"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [
     { name = "Your Name", email = "your.email@example.com" }
 ]
-keywords = ["faq", "knowledge-base", "search", "vector-search", "fastapi"]
+keywords = ["knowledge-base", "search", "vector-search", "fastapi", "hybrid-search", "knowledge-graph", "embeddings", "rag"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Framework :: FastAPI",
@@ -56,6 +56,31 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Local embeddings (recommended for offline use)
+embeddings = [
+    "sentence-transformers>=2.2.0",
+    "torch>=2.0.0",
+]
+
+# OpenAI integration
+openai = [
+    "openai>=1.0.0",
+]
+
+# JWT authentication
+jwt = [
+    "pyjwt>=2.8.0",
+]
+
+# All providers
+all = [
+    "sentence-transformers>=2.2.0",
+    "torch>=2.0.0",
+    "openai>=1.0.0",
+    "pyjwt>=2.8.0",
+]
+
+# Development dependencies
 dev = [
     "pytest>=7.4.0",
     "pytest-asyncio>=0.23.0",
@@ -67,19 +92,31 @@ dev = [
 
 [project.scripts]
 faq-pipeline = "jobs.ticket_pipeline_job:main"
-contextforge = "app.contextforge.cli.commands:main"
+contextforge = "contextforge.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/yourusername/faq-knowledge-base"
-Documentation = "https://github.com/yourusername/faq-knowledge-base#readme"
-Repository = "https://github.com/yourusername/faq-knowledge-base"
+Homepage = "https://github.com/yourusername/contextforge"
+Documentation = "https://github.com/yourusername/contextforge#readme"
+Repository = "https://github.com/yourusername/contextforge"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["app", "pipeline", "jobs"]
+packages = ["contextforge", "app", "pipeline", "jobs"]
+
+[tool.hatch.build.targets.wheel.shared-data]
+"contextforge/admin" = "share/contextforge/admin"
+
+[tool.hatch.build]
+include = [
+    "contextforge/**/*.py",
+    "contextforge/admin/**/*",
+    "app/**/*.py",
+    "pipeline/**/*.py",
+    "jobs/**/*.py",
+]
 
 [tool.ruff]
 target-version = "py311"
@@ -106,7 +143,7 @@ ignore = [
 "alembic/*" = ["ARG001"]  # unused arguments in migrations
 
 [tool.ruff.isort]
-known-first-party = ["app", "pipeline", "jobs"]
+known-first-party = ["contextforge", "app", "pipeline", "jobs"]
 
 [tool.black]
 target-version = ["py311"]
