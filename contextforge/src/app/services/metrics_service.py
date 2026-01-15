@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 
 from app.models.nodes import KnowledgeNode
-from app.models.enums import KnowledgeStatus
+from app.models.enums import KnowledgeStatus, NodeType
 from app.utils.schema import sql as schema_sql
 from app.schemas.metrics import (
     MetricsSummaryResponse,
@@ -36,7 +36,8 @@ class MetricsService:
             KnowledgeNode.tenant_id.in_(self.user_tenant_ids),
         ]
         if node_types:
-            base_filters.append(KnowledgeNode.node_type.in_(node_types))
+            enum_types = [NodeType(nt) for nt in node_types]
+            base_filters.append(KnowledgeNode.node_type.in_(enum_types))
 
         total_query = select(func.count(KnowledgeNode.id)).where(*base_filters)
         published_query = select(func.count(KnowledgeNode.id)).where(

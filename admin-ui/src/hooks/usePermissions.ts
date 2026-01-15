@@ -131,7 +131,7 @@ export function usePermissions(tenantId?: string) {
     try {
       const params: Record<string, string | string[]> = {
         node_types: ['permission_rule'],
-        limit: '1000',
+        limit: '100',
       }
       if (tenantId) {
         params.tenant_ids = [tenantId]

@@ -129,7 +129,7 @@ export function useFAQs(tenantId?: string) {
     try {
       const params: Record<string, string | string[]> = {
         node_types: ['faq'],
-        limit: '1000', // Get all to collect tags
+        limit: '100',
       }
       if (tenantId) {
         params.tenant_ids = [tenantId]

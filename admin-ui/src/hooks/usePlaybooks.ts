@@ -143,7 +143,7 @@ export function usePlaybooks(tenantId?: string) {
     try {
       const params: Record<string, string | string[]> = {
         node_types: ['playbook'],
-        limit: '1000',
+        limit: '100',
       }
       if (tenantId) {
         params.tenant_ids = [tenantId]

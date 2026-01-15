@@ -178,7 +178,7 @@ export function useNodes(initialFilters: NodeFilters = {}) {
   const fetchAllTags = useCallback(async () => {
     try {
       const params: Record<string, string | string[] | number> = {
-        limit: 1000,
+        limit: 100,
       }
       if (filters.node_types && filters.node_types.length > 0) {
         params.node_types = filters.node_types
