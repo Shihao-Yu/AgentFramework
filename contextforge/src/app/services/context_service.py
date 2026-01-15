@@ -186,15 +186,23 @@ class ContextService:
             if request.include_examples:
                 node_types.append(NodeType.EXAMPLE)
         
+        bm25_weight, vector_weight = self._resolve_search_weights(request)
+        
         search_results = await self.node_service.hybrid_search(
             query_text=request.query,
             user_tenant_ids=request.tenant_ids,
             node_types=node_types,
+            tags=request.tags,
+            bm25_weight=bm25_weight,
+            vector_weight=vector_weight,
             limit=request.entry_limit,
         )
         
         entry_points = []
         for result in search_results:
+            if request.min_score is not None and result.rrf_score < request.min_score:
+                continue
+            
             match_source = "hybrid"
             if result.bm25_score and result.bm25_score > 0 and (not result.vector_score or result.vector_score == 0):
                 match_source = "bm25"
@@ -213,6 +221,13 @@ class ContextService:
             ))
         
         return entry_points
+    
+    def _resolve_search_weights(self, request: ContextRequest) -> Tuple[float, float]:
+        if request.search_method == "bm25":
+            return 1.0, 0.0
+        elif request.search_method == "vector":
+            return 0.0, 1.0
+        return request.bm25_weight, request.vector_weight
     
     async def _expand_context(
         self,

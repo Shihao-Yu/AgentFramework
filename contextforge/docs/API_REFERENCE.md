@@ -818,6 +818,171 @@ async def search_nodes(session, query_text, query_embedding, tenant_id):
 
 ---
 
+## ContextForge Library API
+
+### get_context
+
+**Location:** `contextforge.ContextForge.get_context()`
+
+Direct method for context retrieval without HTTP. Designed for framework integrations.
+
+```python
+async def get_context(
+    self,
+    query: Optional[str] = None,
+    tenant_ids: Optional[List[str]] = None,
+    entry_types: Optional[List[NodeType]] = None,
+    tags: Optional[List[str]] = None,
+    max_depth: int = 2,
+    expand: bool = True,
+    entry_limit: int = 10,
+    context_limit: int = 50,
+    include_entities: bool = True,
+    include_schemas: bool = False,
+    include_examples: bool = False,
+    search_method: Literal["hybrid", "bm25", "vector"] = "hybrid",
+    bm25_weight: float = 0.4,
+    vector_weight: float = 0.6,
+    min_score: Optional[float] = None,
+    max_tokens: Optional[int] = None,
+    token_model: str = "gpt-4",
+    expansion_types: Optional[List[NodeType]] = None,
+    *,
+    request: Optional[ContextRequest] = None,
+) -> ContextResponse
+```
+
+**Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `query` | str | None | Search query (required unless `request` provided) |
+| `tenant_ids` | List[str] | None | Tenant IDs (required unless `request` provided) |
+| `entry_types` | List[NodeType] | None | Filter entry points by type |
+| `tags` | List[str] | None | Filter by tags |
+| `search_method` | Literal | "hybrid" | Search method: "hybrid", "bm25", or "vector" |
+| `bm25_weight` | float | 0.4 | BM25 weight (0.0-1.0, hybrid mode) |
+| `vector_weight` | float | 0.6 | Vector weight (0.0-1.0, hybrid mode) |
+| `min_score` | float | None | Minimum score threshold |
+| `max_depth` | int | 2 | Graph expansion depth (1-10) |
+| `expand` | bool | True | Enable graph expansion |
+| `entry_limit` | int | 10 | Max entry points (1-100) |
+| `context_limit` | int | 50 | Max expanded nodes (1-200) |
+| `include_entities` | bool | True | Include related entities |
+| `include_schemas` | bool | False | Include schema nodes |
+| `include_examples` | bool | False | Include example nodes |
+| `max_tokens` | int | None | Token budget (100-128000) |
+| `token_model` | str | "gpt-4" | Model for token counting |
+| `expansion_types` | List[NodeType] | None | Node types for expansion |
+| `request` | ContextRequest | None | Full request (overrides params) |
+
+**Returns:**
+- `ContextResponse` with:
+  - `entry_points`: List of direct search matches
+  - `context`: List of graph-expanded nodes
+  - `entities`: List of related entities
+  - `stats`: Retrieval statistics
+
+**Example:**
+```python
+from contextforge import ContextForge, NodeType
+
+cf = ContextForge(database_url="postgresql+asyncpg://...")
+
+# Simple query
+results = await cf.get_context(
+    query="purchase order",
+    tenant_ids=["acme"],
+)
+
+# Shallow planner context
+results = await cf.get_context(
+    query="how to approve PO?",
+    tenant_ids=["acme"],
+    entry_types=[NodeType.FAQ, NodeType.PLAYBOOK],
+    max_depth=1,
+    max_tokens=3000,
+)
+
+# Keyword search with quality threshold
+results = await cf.get_context(
+    query="error PO-4501",
+    tenant_ids=["acme"],
+    search_method="bm25",
+    min_score=0.3,
+)
+
+# Filter by tags
+results = await cf.get_context(
+    query="workflow",
+    tenant_ids=["acme"],
+    tags=["procurement"],
+)
+
+# Full request object
+from contextforge import ContextRequest
+request = ContextRequest(
+    query="...",
+    tenant_ids=["acme"],
+    bm25_weight=0.3,
+    vector_weight=0.7,
+)
+results = await cf.get_context(request=request)
+```
+
+---
+
+### ContextRequest
+
+**Location:** `contextforge.ContextRequest` (also `app.schemas.context.ContextRequest`)
+
+Request schema for context retrieval.
+
+```python
+class ContextRequest(BaseModel):
+    query: str = ""
+    tenant_ids: List[str] = []
+    
+    entry_types: Optional[List[NodeType]] = None
+    entry_limit: int = 10  # 1-100
+    tags: Optional[List[str]] = None
+    
+    search_method: Literal["hybrid", "bm25", "vector"] = "hybrid"
+    bm25_weight: float = 0.4  # 0.0-1.0
+    vector_weight: float = 0.6  # 0.0-1.0
+    min_score: Optional[float] = None  # 0.0-1.0
+    
+    expand: bool = True
+    expansion_types: Optional[List[NodeType]] = None
+    max_depth: int = 2  # 1-10
+    context_limit: int = 50  # 1-200
+    
+    include_entities: bool = True
+    include_schemas: bool = False
+    include_examples: bool = False
+    
+    max_tokens: Optional[int] = None  # 100-128000
+    token_model: str = "gpt-4"
+```
+
+---
+
+### ContextResponse
+
+**Location:** `contextforge.ContextResponse` (also `app.schemas.context.ContextResponse`)
+
+Response schema for context retrieval.
+
+```python
+class ContextResponse(BaseModel):
+    entry_points: List[EntryPointResult]  # Direct search matches
+    context: List[ContextNodeResult]       # Graph-expanded nodes
+    entities: List[EntityResult]           # Related entities
+    stats: ContextStats                    # Retrieval statistics
+```
+
+---
+
 ## Enumerations
 
 ### Node Types

@@ -6,7 +6,7 @@ The primary entry point for the ContextForge library.
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Optional, List, Literal
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, APIRouter, Depends, Request
@@ -452,3 +452,66 @@ class ContextForge:
                 "connected": row is not None,
                 "schema": self.config.db_schema,
             }
+    
+    # ===================
+    # Context API
+    # ===================
+    
+    async def get_context(
+        self,
+        query: Optional[str] = None,
+        tenant_ids: Optional[List[str]] = None,
+        entry_types: Optional[List["NodeType"]] = None,
+        tags: Optional[List[str]] = None,
+        max_depth: int = 2,
+        expand: bool = True,
+        entry_limit: int = 10,
+        context_limit: int = 50,
+        include_entities: bool = True,
+        include_schemas: bool = False,
+        include_examples: bool = False,
+        search_method: Literal["hybrid", "bm25", "vector"] = "hybrid",
+        bm25_weight: float = 0.4,
+        vector_weight: float = 0.6,
+        min_score: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        token_model: str = "gpt-4",
+        expansion_types: Optional[List["NodeType"]] = None,
+        *,
+        request: Optional["ContextRequest"] = None,
+    ) -> "ContextResponse":
+        from app.schemas.context import ContextRequest, ContextResponse
+        from app.services.context_service import ContextService
+        from app.clients.embedding_client import EmbeddingClient
+        
+        if request is None:
+            if query is None:
+                raise ValueError("Either 'query' or 'request' must be provided")
+            if tenant_ids is None:
+                raise ValueError("Either 'tenant_ids' or 'request' must be provided")
+            
+            request = ContextRequest(
+                query=query,
+                tenant_ids=tenant_ids,
+                entry_types=entry_types,
+                tags=tags,
+                max_depth=max_depth,
+                expand=expand,
+                entry_limit=entry_limit,
+                context_limit=context_limit,
+                include_entities=include_entities,
+                include_schemas=include_schemas,
+                include_examples=include_examples,
+                search_method=search_method,
+                bm25_weight=bm25_weight,
+                vector_weight=vector_weight,
+                min_score=min_score,
+                max_tokens=max_tokens,
+                token_model=token_model,
+                expansion_types=expansion_types,
+            )
+        
+        async with self.get_session() as session:
+            embedding_client = EmbeddingClient(self.embedding_provider)
+            service = ContextService(session, embedding_client)
+            return await service.get_context(request)

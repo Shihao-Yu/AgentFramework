@@ -42,13 +42,25 @@ from contextforge.core.exceptions import (
     AuthorizationError,
 )
 
+try:
+    from app.schemas.context import (
+        ContextRequest,
+        ContextResponse,
+        EntryPointResult,
+        ContextNodeResult,
+        EntityResult,
+        ContextStats,
+    )
+    from app.models.enums import NodeType, EdgeType
+    _CONTEXT_API_AVAILABLE = True
+except ImportError:
+    _CONTEXT_API_AVAILABLE = False
+
 __version__ = "1.0.0"
 
 __all__ = [
-    # Main class
     "ContextForge",
     "ContextForgeConfig",
-    # Exceptions
     "ContextForgeError",
     "ConfigurationError", 
     "DatabaseError",
@@ -57,6 +69,17 @@ __all__ = [
     "EmbeddingError",
     "AuthenticationError",
     "AuthorizationError",
-    # Version
     "__version__",
 ]
+
+if _CONTEXT_API_AVAILABLE:
+    __all__.extend([
+        "ContextRequest",
+        "ContextResponse",
+        "EntryPointResult",
+        "ContextNodeResult",
+        "EntityResult",
+        "ContextStats",
+        "NodeType",
+        "EdgeType",
+    ])

@@ -149,3 +149,54 @@ class TestContextForgeDependencies:
         
         from fastapi.params import Depends as DependsClass
         assert isinstance(cf.require_tenant_access(), DependsClass)
+
+
+class TestContextForgeGetContext:
+
+    def test_get_context_requires_query_or_request(self):
+        """get_context should raise if neither query nor request provided."""
+        cf = ContextForge(
+            database_url=TEST_DB_URL,
+            embedding_provider=MockEmbeddingProvider(),
+        )
+        
+        with pytest.raises(ValueError) as exc_info:
+            import asyncio
+            asyncio.get_event_loop().run_until_complete(
+                cf.get_context(tenant_ids=["test"])
+            )
+        assert "query" in str(exc_info.value)
+
+    def test_get_context_requires_tenant_ids_or_request(self):
+        """get_context should raise if neither tenant_ids nor request provided."""
+        cf = ContextForge(
+            database_url=TEST_DB_URL,
+            embedding_provider=MockEmbeddingProvider(),
+        )
+        
+        with pytest.raises(ValueError) as exc_info:
+            import asyncio
+            asyncio.get_event_loop().run_until_complete(
+                cf.get_context(query="test query")
+            )
+        assert "tenant_ids" in str(exc_info.value)
+
+    def test_get_context_method_exists(self):
+        """get_context method should exist on ContextForge."""
+        cf = ContextForge(
+            database_url=TEST_DB_URL,
+            embedding_provider=MockEmbeddingProvider(),
+        )
+        
+        assert hasattr(cf, 'get_context')
+        assert callable(cf.get_context)
+
+    def test_get_context_is_async(self):
+        """get_context should be an async method."""
+        cf = ContextForge(
+            database_url=TEST_DB_URL,
+            embedding_provider=MockEmbeddingProvider(),
+        )
+        
+        import asyncio
+        assert asyncio.iscoroutinefunction(cf.get_context)

@@ -344,11 +344,88 @@ When you include `cf.router`, these endpoints are available:
 | PUT | `/nodes/{id}` | Update node |
 | DELETE | `/nodes/{id}` | Delete node |
 | GET | `/search` | Hybrid search |
+| POST | `/context` | Context retrieval with graph expansion |
 | GET | `/graph` | Graph traversal |
 | GET | `/tenants` | List tenants |
 | POST | `/tenants` | Create tenant |
 
 Full API documentation at `/docs` when running.
+
+## Library API (Direct Usage)
+
+For framework integrations, you can use the `get_context()` method directly without going through HTTP:
+
+```python
+from contextforge import ContextForge, NodeType
+
+cf = ContextForge(database_url="postgresql+asyncpg://...")
+
+# Simple query
+results = await cf.get_context(
+    query="purchase order approval",
+    tenant_ids=["acme"],
+)
+
+# Shallow context for planners (1-hop, limited types)
+results = await cf.get_context(
+    query="how do I approve a PO?",
+    tenant_ids=["acme"],
+    entry_types=[NodeType.FAQ, NodeType.PLAYBOOK],
+    max_depth=1,
+    max_tokens=3000,
+)
+
+# Keyword-heavy search (BM25 only)
+results = await cf.get_context(
+    query="error code PO-4501",
+    tenant_ids=["acme"],
+    search_method="bm25",
+)
+
+# Filter by tags with quality threshold
+results = await cf.get_context(
+    query="approval workflow",
+    tenant_ids=["acme"],
+    tags=["procurement"],
+    min_score=0.3,
+)
+
+# Advanced: full request object
+from contextforge import ContextRequest
+request = ContextRequest(
+    query="...",
+    tenant_ids=["acme"],
+    entry_types=[NodeType.FAQ],
+    search_method="hybrid",
+    bm25_weight=0.3,
+    vector_weight=0.7,
+)
+results = await cf.get_context(request=request)
+```
+
+### get_context() Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `query` | str | required | Search query text |
+| `tenant_ids` | List[str] | required | Tenant IDs to search within |
+| `entry_types` | List[NodeType] | None | Filter entry points by node type |
+| `tags` | List[str] | None | Filter by tags |
+| `search_method` | "hybrid"\|"bm25"\|"vector" | "hybrid" | Search method |
+| `bm25_weight` | float | 0.4 | BM25 keyword weight (hybrid mode) |
+| `vector_weight` | float | 0.6 | Vector semantic weight (hybrid mode) |
+| `min_score` | float | None | Minimum score threshold |
+| `max_depth` | int | 2 | Graph expansion depth |
+| `expand` | bool | True | Enable graph expansion |
+| `entry_limit` | int | 10 | Max entry points |
+| `context_limit` | int | 50 | Max expanded nodes |
+| `include_entities` | bool | True | Include related entities |
+| `include_schemas` | bool | False | Include schema nodes |
+| `include_examples` | bool | False | Include example nodes |
+| `max_tokens` | int | None | Token budget limit |
+| `token_model` | str | "gpt-4" | Model for token counting |
+| `expansion_types` | List[NodeType] | None | Node types for expansion |
+| `request` | ContextRequest | None | Full request object (overrides params) |
 
 ## Example: Complete Integration
 
