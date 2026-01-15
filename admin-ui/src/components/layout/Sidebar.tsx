@@ -142,12 +142,10 @@ export function Sidebar() {
         aria-label="Main navigation"
       >
         {/* Header */}
-        <div className="flex h-16 items-center justify-between border-b border-border/50 px-4">
+        <div className="flex h-16 items-center justify-between border-b border-border/50 px-2">
           {!collapsed && (
-            <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 shrink-0">
-                <BookOpen className="h-5 w-5 text-primary" aria-hidden="true" />
-              </div>
+            <div className="flex items-center gap-3 px-3">
+              <BookOpen className="h-5 w-5 text-primary shrink-0" aria-hidden="true" />
               <span className="font-semibold tracking-tight text-sm whitespace-nowrap">Context Management</span>
             </div>
           )}

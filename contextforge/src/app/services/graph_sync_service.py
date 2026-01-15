@@ -267,3 +267,132 @@ class GraphSyncService:
         await self.session.commit()
         
         return deleted
+    
+    # =========================================================================
+    # Incremental Shared Tag Edge Sync (for use on node create/update)
+    # =========================================================================
+    
+    async def sync_shared_tag_edges_for_node(
+        self,
+        node_id: int,
+        node_tags: List[str],
+        tenant_id: str,
+        min_shared_tags: int = 2,
+        commit: bool = False,
+    ) -> int:
+        """
+        Incrementally sync SHARED_TAG edges for a single node.
+        
+        Called after node create/update to maintain tag-based edges.
+        Only creates edges with nodes that share >= min_shared_tags.
+        
+        Performance: O(n) where n = nodes with overlapping tags in same tenant.
+        Typically completes in 10-50ms.
+        
+        Args:
+            node_id: ID of the node to sync edges for
+            node_tags: Current tags of the node
+            tenant_id: Tenant ID for scoping
+            min_shared_tags: Minimum shared tags required for edge (default: 2)
+            commit: Whether to commit transaction (default: False, caller commits)
+        
+        Returns:
+            Number of edges created/updated
+        """
+        if not node_tags or len(node_tags) < min_shared_tags:
+            # Node doesn't have enough tags to form edges
+            return 0
+        
+        # First, delete existing SHARED_TAG edges for this node
+        # (they'll be recreated if still valid)
+        await self.session.execute(
+            text(schema_sql("""
+                DELETE FROM {schema}.knowledge_edges
+                WHERE edge_type = 'shared_tag'
+                  AND is_auto_generated = TRUE
+                  AND (source_id = :node_id OR target_id = :node_id)
+            """)),
+            {"node_id": node_id}
+        )
+        
+        # Find all nodes with overlapping tags and create edges
+        result = await self.session.execute(
+            text(schema_sql("""
+                WITH overlapping_nodes AS (
+                    SELECT 
+                        n.id as other_id,
+                        array_length(
+                            ARRAY(SELECT unnest(:node_tags::text[]) INTERSECT SELECT unnest(n.tags)),
+                            1
+                        ) as shared_count
+                    FROM {schema}.knowledge_nodes n
+                    WHERE n.id != :node_id
+                      AND n.tenant_id = :tenant_id
+                      AND n.is_deleted = FALSE
+                      AND n.status = 'published'
+                      AND n.tags && :node_tags::text[]
+                )
+                INSERT INTO {schema}.knowledge_edges (source_id, target_id, edge_type, weight, is_auto_generated, created_by)
+                SELECT 
+                    LEAST(:node_id, other_id),
+                    GREATEST(:node_id, other_id),
+                    'shared_tag',
+                    LEAST(shared_count::float / 5.0, 1.0),
+                    TRUE,
+                    'system'
+                FROM overlapping_nodes
+                WHERE shared_count >= :min_shared_tags
+                ON CONFLICT (source_id, target_id, edge_type) DO UPDATE
+                SET weight = EXCLUDED.weight,
+                    updated_at = NOW()
+                RETURNING id
+            """)),
+            {
+                "node_id": node_id,
+                "node_tags": node_tags,
+                "tenant_id": tenant_id,
+                "min_shared_tags": min_shared_tags,
+            }
+        )
+        
+        created = len(result.fetchall())
+        
+        if commit:
+            await self.session.commit()
+        
+        return created
+    
+    async def delete_shared_tag_edges_for_node(
+        self,
+        node_id: int,
+        commit: bool = False,
+    ) -> int:
+        """
+        Delete all SHARED_TAG edges for a node.
+        
+        Called when a node is deleted or its tags are cleared.
+        
+        Args:
+            node_id: ID of the node
+            commit: Whether to commit transaction (default: False)
+        
+        Returns:
+            Number of edges deleted
+        """
+        result = await self.session.execute(
+            text(schema_sql("""
+                DELETE FROM {schema}.knowledge_edges
+                WHERE edge_type = 'shared_tag'
+                  AND is_auto_generated = TRUE
+                  AND (source_id = :node_id OR target_id = :node_id)
+                RETURNING id
+            """)),
+            {"node_id": node_id}
+        )
+        
+        deleted = len(result.fetchall())
+        
+        if commit:
+            await self.session.commit()
+        
+        return deleted

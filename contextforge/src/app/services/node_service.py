@@ -21,6 +21,10 @@ from app.schemas.common import PaginatedResponse
 from app.clients.embedding_client import EmbeddingClient
 from app.utils.schema import sql
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class EmbeddingClientRequiredError(RuntimeError):
     pass
@@ -125,6 +129,7 @@ class NodeService:
         data: NodeCreate,
         user_tenant_ids: List[str],
         created_by: Optional[str] = None,
+        sync_tag_edges: bool = True,
     ) -> Optional[KnowledgeNode]:
         if data.tenant_id not in user_tenant_ids:
             return None
@@ -163,6 +168,14 @@ class NodeService:
             {"id": node.id, "embedding": embedding}
         )
         
+        # Sync SHARED_TAG edges if node has tags and is published
+        if sync_tag_edges and data.tags and data.status == KnowledgeStatus.PUBLISHED:
+            await self._sync_shared_tag_edges(
+                node_id=node.id,
+                node_tags=data.tags,
+                tenant_id=data.tenant_id,
+            )
+        
         await self.session.commit()
         await self.session.refresh(node)
         
@@ -174,6 +187,7 @@ class NodeService:
         data: NodeUpdate,
         user_tenant_ids: List[str],
         updated_by: Optional[str] = None,
+        sync_tag_edges: bool = True,
     ) -> Optional[KnowledgeNode]:
         node = await self.get_node(node_id, user_tenant_ids)
         if not node:
@@ -181,8 +195,16 @@ class NodeService:
         
         update_data = data.model_dump(exclude_unset=True)
         content_changed = False
+        tags_changed = False
+        status_changed = False
+        old_tags = list(node.tags) if node.tags else []
+        old_status = node.status
         
         for field, value in update_data.items():
+            if field == "tags" and value != old_tags:
+                tags_changed = True
+            if field == "status" and value != old_status:
+                status_changed = True
             setattr(node, field, value)
             if field in ("title", "content", "summary"):
                 content_changed = True
@@ -207,6 +229,19 @@ class NodeService:
                 """)),
                 {"id": node.id, "embedding": embedding}
             )
+        
+        # Sync SHARED_TAG edges if tags or status changed
+        if sync_tag_edges and (tags_changed or status_changed):
+            if node.status == KnowledgeStatus.PUBLISHED and node.tags:
+                # Node is published with tags - sync edges
+                await self._sync_shared_tag_edges(
+                    node_id=node.id,
+                    node_tags=node.tags,
+                    tenant_id=node.tenant_id,
+                )
+            else:
+                # Node unpublished or tags cleared - remove edges
+                await self._delete_shared_tag_edges(node_id=node.id)
         
         await self.session.commit()
         await self.session.refresh(node)
@@ -412,3 +447,105 @@ class NodeService:
                     parts.append(str(content[key]))
         
         return "\n".join(parts)
+    
+    # =========================================================================
+    # Shared Tag Edge Sync Helpers
+    # =========================================================================
+    
+    async def _sync_shared_tag_edges(
+        self,
+        node_id: int,
+        node_tags: List[str],
+        tenant_id: str,
+        min_shared_tags: int = 2,
+    ) -> int:
+        """
+        Sync SHARED_TAG edges for a node using inline SQL.
+        
+        This is a lightweight version that doesn't require GraphSyncService,
+        suitable for use within NodeService transactions.
+        """
+        if not node_tags or len(node_tags) < min_shared_tags:
+            return 0
+        
+        try:
+            # Delete existing SHARED_TAG edges for this node
+            await self.session.execute(
+                text(sql("""
+                    DELETE FROM {schema}.knowledge_edges
+                    WHERE edge_type = 'shared_tag'
+                      AND is_auto_generated = TRUE
+                      AND (source_id = :node_id OR target_id = :node_id)
+                """)),
+                {"node_id": node_id}
+            )
+            
+            # Create edges with nodes that have overlapping tags
+            result = await self.session.execute(
+                text(sql("""
+                    WITH overlapping_nodes AS (
+                        SELECT 
+                            n.id as other_id,
+                            array_length(
+                                ARRAY(SELECT unnest(:node_tags::text[]) INTERSECT SELECT unnest(n.tags)),
+                                1
+                            ) as shared_count
+                        FROM {schema}.knowledge_nodes n
+                        WHERE n.id != :node_id
+                          AND n.tenant_id = :tenant_id
+                          AND n.is_deleted = FALSE
+                          AND n.status = 'published'
+                          AND n.tags && :node_tags::text[]
+                    )
+                    INSERT INTO {schema}.knowledge_edges (source_id, target_id, edge_type, weight, is_auto_generated, created_by)
+                    SELECT 
+                        LEAST(:node_id, other_id),
+                        GREATEST(:node_id, other_id),
+                        'shared_tag',
+                        LEAST(shared_count::float / 5.0, 1.0),
+                        TRUE,
+                        'system'
+                    FROM overlapping_nodes
+                    WHERE shared_count >= :min_shared_tags
+                    ON CONFLICT (source_id, target_id, edge_type) DO UPDATE
+                    SET weight = EXCLUDED.weight,
+                        updated_at = NOW()
+                    RETURNING id
+                """)),
+                {
+                    "node_id": node_id,
+                    "node_tags": node_tags,
+                    "tenant_id": tenant_id,
+                    "min_shared_tags": min_shared_tags,
+                }
+            )
+            
+            created = len(result.fetchall())
+            logger.debug(f"Synced {created} SHARED_TAG edges for node {node_id}")
+            return created
+            
+        except Exception as e:
+            logger.warning(f"Failed to sync SHARED_TAG edges for node {node_id}: {e}")
+            return 0
+    
+    async def _delete_shared_tag_edges(self, node_id: int) -> int:
+        """Delete all SHARED_TAG edges for a node."""
+        try:
+            result = await self.session.execute(
+                text(sql("""
+                    DELETE FROM {schema}.knowledge_edges
+                    WHERE edge_type = 'shared_tag'
+                      AND is_auto_generated = TRUE
+                      AND (source_id = :node_id OR target_id = :node_id)
+                    RETURNING id
+                """)),
+                {"node_id": node_id}
+            )
+            
+            deleted = len(result.fetchall())
+            logger.debug(f"Deleted {deleted} SHARED_TAG edges for node {node_id}")
+            return deleted
+            
+        except Exception as e:
+            logger.warning(f"Failed to delete SHARED_TAG edges for node {node_id}: {e}")
+            return 0

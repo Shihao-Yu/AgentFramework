@@ -114,12 +114,12 @@ export interface PermissionRuleContent {
 export interface EntityAttribute {
   name: string
   type: string
-  description: string
+  description?: string
 }
 
 export interface EntityOperation {
   action: string
-  description: string
+  description?: string
 }
 
 export interface EntityContent {
