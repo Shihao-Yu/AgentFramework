@@ -29,7 +29,7 @@ from app.models.nodes import KnowledgeNode
 from app.models.edges import KnowledgeEdge
 from app.clients.embedding_client import EmbeddingClient
 from app.utils.schema import sql as schema_sql
-from app.services.queryforge_adapter import KnowledgeVerseAdapter
+
 from app.utils.query_validator import QueryValidator, QueryValidationResult
 
 
@@ -89,13 +89,11 @@ class QueryForgeService:
         self,
         session: AsyncSession,
         embedding_client: EmbeddingClient,
-        vector_store: Optional[Any] = None,
         llm_client: Optional[Any] = None,
         langfuse_client: Optional[Any] = None,
     ):
         self.session = session
         self.embedding_client = embedding_client
-        self.vector_store = vector_store
         self.llm_client = llm_client
         self.langfuse_client = langfuse_client
     
@@ -430,15 +428,7 @@ class QueryForgeService:
                 }
             
             if use_pipeline and (_QUERYFORGE_AVAILABLE or _CONTEXTFORGE_AVAILABLE):
-                vector_store = self.vector_store
-                if vector_store is None:
-                    vector_store = KnowledgeVerseAdapter(
-                        session=self.session,
-                        embedding_client=self.embedding_client,
-                    )
-                
                 pipeline = QueryGenerationPipeline(
-                    vector_store=vector_store,
                     llm_client=self.llm_client,
                 )
                 
