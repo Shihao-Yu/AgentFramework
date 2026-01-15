@@ -163,7 +163,7 @@ export function PermissionFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col gap-0">
+      <DialogContent className="max-w-6xl max-h-[85vh] flex flex-col gap-0">
         <DialogHeader className="pb-4 border-b">
           <DialogTitle>{isEditing ? 'Edit Feature Permission' : 'Add Feature Permission'}</DialogTitle>
           <DialogDescription>

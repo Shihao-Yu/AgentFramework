@@ -115,7 +115,7 @@ export function useGraph() {
           { params }
         )
 
-        const graphNodes: GraphNode[] = nodesResponse.data.map(n => ({
+        const graphNodes: GraphNode[] = (nodesResponse.data ?? []).map(n => ({
           id: n.id,
           tenant_id: n.tenant_id,
           node_type: n.node_type as NodeType,
@@ -139,7 +139,7 @@ export function useGraph() {
           )
           
           const nodeIdSet = new Set(nodeIds)
-          edgesResponse.edges.forEach(edge => {
+          ;(edgesResponse.edges ?? []).forEach(edge => {
             if (nodeIdSet.has(edge.source_id) && nodeIdSet.has(edge.target_id)) {
               graphEdges.push({
                 source: edge.source_id,
@@ -191,7 +191,7 @@ export function useGraph() {
       })
 
       // Convert context response to graph nodes
-      const allContextNodes = [...response.entry_points, ...response.context]
+      const allContextNodes = [...(response.entry_points ?? []), ...(response.context ?? [])]
       const nodeMap = new Map<number, GraphNode>()
       
       allContextNodes.forEach(cn => {
@@ -212,7 +212,7 @@ export function useGraph() {
       })
 
       const graphNodes = Array.from(nodeMap.values())
-      const matchedIds = response.entry_points.map(ep => ep.id)
+      const matchedIds = (response.entry_points ?? []).map(ep => ep.id)
 
       const nodeIds = graphNodes.map(n => n.id)
       const graphEdges: GraphEdge[] = []
@@ -229,7 +229,7 @@ export function useGraph() {
         const nodeIdSet = new Set(nodeIds)
         
         edgeResponses.forEach(response => {
-          response.edges.forEach(edge => {
+          ;(response.edges ?? []).forEach(edge => {
             if (nodeIdSet.has(edge.source_id) && nodeIdSet.has(edge.target_id)) {
               const edgeKey = `${edge.source_id}-${edge.target_id}`
               if (!seenEdges.has(edgeKey)) {
@@ -320,7 +320,7 @@ export function useGraph() {
       }
 
       // Convert neighbors to graph nodes
-      const graphNodes: GraphNode[] = neighbors
+      const graphNodes: GraphNode[] = (neighbors ?? [])
         .filter(n => !nodeTypes || nodeTypes.includes(n.node_type as NodeType))
         .map(n => ({
           id: n.id,
@@ -343,7 +343,7 @@ export function useGraph() {
 
       // Build edges (we need to fetch them separately or infer from neighbors)
       // For now, create edges from center to all neighbors
-      const graphEdges: GraphEdge[] = neighbors.map(n => ({
+      const graphEdges: GraphEdge[] = (neighbors ?? []).map(n => ({
         source: nodeId,
         target: n.id,
         edge_type: 'related' as EdgeType,
@@ -421,7 +421,7 @@ export function useGraph() {
         params: { source_id: sourceId, target_id: targetId, max_depth: maxDepth },
       })
       
-      return response.paths
+      return response.paths ?? []
     } catch (err) {
       console.error('Failed to find paths:', err)
       return []

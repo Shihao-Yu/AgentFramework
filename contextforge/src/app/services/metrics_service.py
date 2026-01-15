@@ -28,24 +28,27 @@ class MetricsService:
         self.session = session
         self.user_tenant_ids = user_tenant_ids
 
-    async def get_summary(self, days: int = 7) -> MetricsSummaryResponse:
-        total_query = select(func.count(KnowledgeNode.id)).where(
+    async def get_summary(
+        self, days: int = 7, node_types: list[str] | None = None
+    ) -> MetricsSummaryResponse:
+        base_filters = [
             KnowledgeNode.is_deleted == False,
             KnowledgeNode.tenant_id.in_(self.user_tenant_ids),
-        )
+        ]
+        if node_types:
+            base_filters.append(KnowledgeNode.node_type.in_(node_types))
+
+        total_query = select(func.count(KnowledgeNode.id)).where(*base_filters)
         published_query = select(func.count(KnowledgeNode.id)).where(
-            KnowledgeNode.is_deleted == False,
-            KnowledgeNode.tenant_id.in_(self.user_tenant_ids),
+            *base_filters,
             KnowledgeNode.status == KnowledgeStatus.PUBLISHED,
         )
         draft_query = select(func.count(KnowledgeNode.id)).where(
-            KnowledgeNode.is_deleted == False,
-            KnowledgeNode.tenant_id.in_(self.user_tenant_ids),
+            *base_filters,
             KnowledgeNode.status == KnowledgeStatus.DRAFT,
         )
         archived_query = select(func.count(KnowledgeNode.id)).where(
-            KnowledgeNode.is_deleted == False,
-            KnowledgeNode.tenant_id.in_(self.user_tenant_ids),
+            *base_filters,
             KnowledgeNode.status == KnowledgeStatus.ARCHIVED,
         )
 
@@ -68,13 +71,19 @@ class MetricsService:
         total_hits = (await self.session.execute(hits_stmt, {"start_date": start_date})).scalar() or 0
         total_sessions = (await self.session.execute(sessions_stmt, {"start_date": start_date})).scalar() or 0
 
-        never_accessed_stmt = text(schema_sql("""
-            SELECT COUNT(*) FROM {schema}.knowledge_nodes k
+        node_type_filter = ""
+        if node_types:
+            node_type_list = ", ".join(f"'{nt}'" for nt in node_types)
+            node_type_filter = f"AND k.node_type IN ({node_type_list})"
+
+        never_accessed_stmt = text(schema_sql(f"""
+            SELECT COUNT(*) FROM {{schema}}.knowledge_nodes k
             WHERE k.is_deleted = FALSE
               AND k.status = 'published'
               AND k.tenant_id = ANY(:tenant_ids)
+              {node_type_filter}
               AND NOT EXISTS (
-                  SELECT 1 FROM {schema}.knowledge_hits h 
+                  SELECT 1 FROM {{schema}}.knowledge_hits h 
                   WHERE h.node_id = k.id
               )
         """))

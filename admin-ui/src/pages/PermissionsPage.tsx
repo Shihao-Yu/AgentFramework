@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -15,7 +15,10 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { PermissionDataTable, PermissionFormDialog } from '@/components/permissions'
 import { usePermissions } from '@/hooks/usePermissions'
+import { useMetricsSummary } from '@/hooks/useMetricsSummary'
 import type { PermissionItem, PermissionFormData } from '@/types/knowledge'
+
+const PERMISSION_NODE_TYPES = ['permission_rule']
 
 export function PermissionsPage() {
   const { 
@@ -31,6 +34,9 @@ export function PermissionsPage() {
     deleteItem,
     updateFilters,
   } = usePermissions()
+  
+  const metricsSummaryOptions = useMemo(() => ({ nodeTypes: PERMISSION_NODE_TYPES }), [])
+  const { summary: metricsSummary } = useMetricsSummary(metricsSummaryOptions)
   const [formOpen, setFormOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<PermissionItem | null>(null)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
@@ -87,7 +93,6 @@ export function PermissionsPage() {
     updateFilters({ page })
   }, [updateFilters])
 
-  const publishedCount = items.filter((i) => i.status === 'published').length
   const uniqueRolesCount = existingRoles.length
 
   return (
@@ -111,7 +116,7 @@ export function PermissionsPage() {
             <CardTitle className="text-sm font-medium">Total Features</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{pagination.total}</div>
+            <div className="text-2xl font-bold">{metricsSummary.totalItems}</div>
           </CardContent>
         </Card>
         <Card>
@@ -119,7 +124,7 @@ export function PermissionsPage() {
             <CardTitle className="text-sm font-medium">Published</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{publishedCount}</div>
+            <div className="text-2xl font-bold text-green-600">{metricsSummary.publishedItems}</div>
           </CardContent>
         </Card>
         <Card>

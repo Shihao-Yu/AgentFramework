@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -12,7 +12,10 @@ import {
 } from '@/components/ui/dialog'
 import { FAQDataTable, FAQFormDialog } from '@/components/faq'
 import { useFAQs } from '@/hooks/useFAQ'
+import { useMetricsSummary } from '@/hooks/useMetricsSummary'
 import type { FAQItem, FAQFormData } from '@/types/knowledge'
+
+const FAQ_NODE_TYPES = ['faq']
 
 export function FAQPage() {
   const { 
@@ -26,6 +29,9 @@ export function FAQPage() {
     deleteItem,
     updateFilters,
   } = useFAQs()
+  
+  const metricsSummaryOptions = useMemo(() => ({ nodeTypes: FAQ_NODE_TYPES }), [])
+  const { summary: metricsSummary } = useMetricsSummary(metricsSummaryOptions)
   const [formOpen, setFormOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<FAQItem | null>(null)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
@@ -77,9 +83,6 @@ export function FAQPage() {
     updateFilters({ page })
   }, [updateFilters])
 
-  const publishedCount = items.filter((i) => i.status === 'published').length
-  const draftCount = items.filter((i) => i.status === 'draft').length
-
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -101,7 +104,7 @@ export function FAQPage() {
             <CardTitle className="text-sm font-medium">Total FAQs</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{pagination.total}</div>
+            <div className="text-2xl font-bold">{metricsSummary.totalItems}</div>
           </CardContent>
         </Card>
         <Card>
@@ -109,7 +112,7 @@ export function FAQPage() {
             <CardTitle className="text-sm font-medium">Published</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{publishedCount}</div>
+            <div className="text-2xl font-bold text-green-600">{metricsSummary.publishedItems}</div>
           </CardContent>
         </Card>
         <Card>
@@ -117,7 +120,7 @@ export function FAQPage() {
             <CardTitle className="text-sm font-medium">Drafts</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-muted-foreground">{draftCount}</div>
+            <div className="text-2xl font-bold text-muted-foreground">{metricsSummary.draftItems}</div>
           </CardContent>
         </Card>
       </div>

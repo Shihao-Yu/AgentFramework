@@ -46,7 +46,7 @@ export function useTenants() {
         // Fetch user's tenant access
         const accessResponse = await apiRequest<UserTenantsResponse>('/api/tenants/me')
         
-        const tenantAccess: TenantAccess[] = accessResponse.tenants.map(t => ({
+        const tenantAccess: TenantAccess[] = (accessResponse.tenants ?? []).map(t => ({
           tenant_id: t.tenant_id,
           tenant_name: t.tenant_name || t.tenant_id,
           role: t.role,
@@ -61,7 +61,7 @@ export function useTenants() {
         // Fetch full tenant list
         const tenantsResponse = await apiRequest<TenantListResponse>('/api/tenants')
         
-        const tenantList: Tenant[] = tenantsResponse.tenants.map(t => ({
+        const tenantList: Tenant[] = (tenantsResponse.tenants ?? []).map(t => ({
           id: t.id,
           name: t.name,
           description: t.description,
@@ -162,7 +162,7 @@ export function useTenants() {
     try {
       const accessResponse = await apiRequest<UserTenantsResponse>('/api/tenants/me')
       
-      const tenantAccess: TenantAccess[] = accessResponse.tenants.map(t => ({
+      const tenantAccess: TenantAccess[] = (accessResponse.tenants ?? []).map(t => ({
         tenant_id: t.tenant_id,
         tenant_name: t.tenant_name || t.tenant_id,
         role: t.role,
@@ -171,7 +171,7 @@ export function useTenants() {
       
       const tenantsResponse = await apiRequest<TenantListResponse>('/api/tenants')
       
-      const tenantList: Tenant[] = tenantsResponse.tenants.map(t => ({
+      const tenantList: Tenant[] = (tenantsResponse.tenants ?? []).map(t => ({
         id: t.id,
         name: t.name,
         description: t.description,

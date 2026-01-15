@@ -48,7 +48,7 @@ export function useStaging() {
       const response = await apiRequest<StagingListResponse>('/api/staging', {
         params: { status: 'pending', limit: 100 },
       })
-      setItems(response.items)
+      setItems(response.items ?? [])
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch staging items'
       setError(message)

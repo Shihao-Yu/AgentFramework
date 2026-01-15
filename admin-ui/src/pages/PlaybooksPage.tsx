@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -14,7 +14,10 @@ import { Badge } from '@/components/ui/badge'
 import { PlaybookDataTable, PlaybookFormDialog } from '@/components/playbooks'
 import { MarkdownPreview } from '@/components/editors'
 import { usePlaybooks } from '@/hooks/usePlaybooks'
+import { useMetricsSummary } from '@/hooks/useMetricsSummary'
 import type { PlaybookItem, PlaybookFormData } from '@/types/knowledge'
+
+const PLAYBOOK_NODE_TYPES = ['playbook']
 
 export function PlaybooksPage() {
   const { 
@@ -30,6 +33,9 @@ export function PlaybooksPage() {
     updateFilters,
     addCustomDomain 
   } = usePlaybooks()
+  
+  const metricsSummaryOptions = useMemo(() => ({ nodeTypes: PLAYBOOK_NODE_TYPES }), [])
+  const { summary: metricsSummary } = useMetricsSummary(metricsSummaryOptions)
   const [formOpen, setFormOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<PlaybookItem | null>(null)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
@@ -91,13 +97,10 @@ export function PlaybooksPage() {
     return domain?.name || domainId
   }
 
-  // Stats
-  const publishedCount = items.filter((i) => i.status === 'published').length
   const uniqueDomains = new Set(items.map((i) => i.content.domain)).size
 
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Playbooks</h1>
@@ -111,14 +114,13 @@ export function PlaybooksPage() {
         </Button>
       </div>
 
-      {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Playbooks</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{pagination.total}</div>
+            <div className="text-2xl font-bold">{metricsSummary.totalItems}</div>
           </CardContent>
         </Card>
         <Card>
@@ -126,7 +128,7 @@ export function PlaybooksPage() {
             <CardTitle className="text-sm font-medium">Published</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{publishedCount}</div>
+            <div className="text-2xl font-bold text-green-600">{metricsSummary.publishedItems}</div>
           </CardContent>
         </Card>
         <Card>

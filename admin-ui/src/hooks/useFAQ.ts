@@ -82,7 +82,7 @@ export function useFAQs(tenantId?: string) {
       
       const response = await apiRequest<ApiNodeListResponse>('/api/nodes', { params })
       
-      const faqItems: FAQItem[] = response.data.map(node => ({
+      const faqItems: FAQItem[] = (response.data ?? []).map(node => ({
         id: node.id,
         knowledge_type: 'faq',
         title: node.title,
@@ -107,8 +107,8 @@ export function useFAQs(tenantId?: string) {
       
       // Collect all unique tags from results for the filter
       const tagsFromResults = new Set<string>()
-      response.data.forEach(node => {
-        node.tags.forEach(tag => tagsFromResults.add(tag))
+      ;(response.data ?? []).forEach(node => {
+        (node.tags ?? []).forEach(tag => tagsFromResults.add(tag))
       })
       // Merge with existing tags to keep filter options stable
       setAllTags(prev => {
@@ -136,8 +136,8 @@ export function useFAQs(tenantId?: string) {
       }
       const response = await apiRequest<ApiNodeListResponse>('/api/nodes', { params })
       const tags = new Set<string>()
-      response.data.forEach(node => {
-        node.tags.forEach(tag => tags.add(tag))
+      ;(response.data ?? []).forEach(node => {
+        (node.tags ?? []).forEach(tag => tags.add(tag))
       })
       setAllTags(Array.from(tags).sort())
     } catch (err) {
