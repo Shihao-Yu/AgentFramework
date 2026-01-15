@@ -27,23 +27,58 @@ interface ApiNodeListResponse {
   total_pages: number
 }
 
+interface PermissionFilters {
+  search?: string
+  tags?: string[]
+  page?: number
+  limit?: number
+}
+
+interface PaginationInfo {
+  page: number
+  limit: number
+  total: number
+  totalPages: number
+}
+
 export function usePermissions(tenantId?: string) {
   const [items, setItems] = useState<PermissionItem[]>([])
+  const [allTags, setAllTags] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [filters, setFilters] = useState<PermissionFilters>({
+    page: 1,
+    limit: 100,
+  })
+  const [pagination, setPagination] = useState<PaginationInfo>({
+    page: 1,
+    limit: 100,
+    total: 0,
+    totalPages: 0,
+  })
 
-  const fetchItems = useCallback(async () => {
+  const fetchItems = useCallback(async (currentFilters?: PermissionFilters) => {
+    const f = currentFilters || filters
     setIsLoading(true)
     setError(null)
     
     try {
       const params: Record<string, string | string[]> = {
-        node_types: ['permission'],
-        limit: '100',
+        node_types: ['permission_rule'],
+        limit: String(f.limit || 100),
+        page: String(f.page || 1),
       }
       
       if (tenantId) {
         params.tenant_ids = [tenantId]
+      }
+      
+      if (f.search && f.search.trim()) {
+        params.search = f.search.trim()
+      }
+      
+      if (f.tags && f.tags.length > 0) {
+        params.tags = f.tags
       }
       
       const response = await apiRequest<ApiNodeListResponse>('/api/nodes', { params })
@@ -66,6 +101,22 @@ export function usePermissions(tenantId?: string) {
       }))
       
       setItems(permissionItems)
+      setPagination({
+        page: response.page,
+        limit: response.limit,
+        total: response.total,
+        totalPages: response.total_pages,
+      })
+      
+      // Collect all unique tags from results for the filter
+      const tagsFromResults = new Set<string>()
+      response.data.forEach(node => {
+        node.tags.forEach(tag => tagsFromResults.add(tag))
+      })
+      setAllTags(prev => {
+        const merged = new Set([...prev, ...tagsFromResults])
+        return Array.from(merged).sort()
+      })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch permissions'
       setError(message)
@@ -73,10 +124,44 @@ export function usePermissions(tenantId?: string) {
     } finally {
       setIsLoading(false)
     }
+  }, [filters, tenantId])
+
+  // Fetch all tags on mount
+  const fetchAllTags = useCallback(async () => {
+    try {
+      const params: Record<string, string | string[]> = {
+        node_types: ['permission_rule'],
+        limit: '1000',
+      }
+      if (tenantId) {
+        params.tenant_ids = [tenantId]
+      }
+      const response = await apiRequest<ApiNodeListResponse>('/api/nodes', { params })
+      const tags = new Set<string>()
+      response.data.forEach(node => {
+        node.tags.forEach(tag => tags.add(tag))
+      })
+      setAllTags(Array.from(tags).sort())
+    } catch (err) {
+      console.error('Failed to fetch tags:', err)
+    }
   }, [tenantId])
 
   useEffect(() => {
     fetchItems()
+    fetchAllTags()
+  }, [])
+
+  // Update filters and refetch
+  const updateFilters = useCallback((newFilters: Partial<PermissionFilters>) => {
+    setFilters(prev => {
+      const updated = { ...prev, ...newFilters }
+      if (newFilters.search !== undefined || newFilters.tags !== undefined) {
+        updated.page = 1
+      }
+      fetchItems(updated)
+      return updated
+    })
   }, [fetchItems])
 
   const existingPermissions = useMemo(() => {
@@ -119,7 +204,7 @@ export function usePermissions(tenantId?: string) {
         method: 'POST',
         body: JSON.stringify({
           tenant_id: tenantId || 'default',
-          node_type: 'permission',
+          node_type: 'permission_rule',
           title: data.title,
           content: {
             description: data.description,
@@ -149,7 +234,7 @@ export function usePermissions(tenantId?: string) {
         created_at: response.created_at,
       }
       
-      setItems(prev => [newItem, ...prev])
+      await fetchItems()
       return newItem
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to create permission'
@@ -158,7 +243,7 @@ export function usePermissions(tenantId?: string) {
     } finally {
       setIsLoading(false)
     }
-  }, [tenantId])
+  }, [tenantId, fetchItems])
 
   const updateItem = useCallback(async (id: number, data: PermissionFormData): Promise<void> => {
     setIsLoading(true)
@@ -228,6 +313,7 @@ export function usePermissions(tenantId?: string) {
     try {
       await apiRequest(`/api/nodes/${id}`, { method: 'DELETE' })
       setItems(prev => prev.filter(item => item.id !== id))
+      setPagination(prev => ({ ...prev, total: prev.total - 1 }))
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to delete permission'
       setError(message)
@@ -239,6 +325,9 @@ export function usePermissions(tenantId?: string) {
 
   return {
     items,
+    allTags,
+    pagination,
+    filters,
     isLoading,
     error,
     existingPermissions,
@@ -246,6 +335,7 @@ export function usePermissions(tenantId?: string) {
     createItem,
     updateItem,
     deleteItem,
+    updateFilters,
     refetch: fetchItems,
   }
 }

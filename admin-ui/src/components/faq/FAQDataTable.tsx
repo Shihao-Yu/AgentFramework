@@ -1,16 +1,13 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import {
   type ColumnDef,
-  type ColumnFiltersState,
   type SortingState,
   flexRender,
   getCoreRowModel,
-  getFilteredRowModel,
-  getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table'
-import { ArrowUpDown, Pencil, Trash2 } from 'lucide-react'
+import { ArrowUpDown, Pencil, Trash2, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -22,18 +19,61 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { MultiSelect } from '@/components/ui/multi-select'
 import type { FAQItem } from '@/types/knowledge'
 import { format } from 'date-fns'
 
-interface FAQDataTableProps {
-  data: FAQItem[]
-  onEdit: (item: FAQItem) => void
-  onDelete: (item: FAQItem) => void
+interface PaginationInfo {
+  page: number
+  limit: number
+  total: number
+  totalPages: number
 }
 
-export function FAQDataTable({ data, onEdit, onDelete }: FAQDataTableProps) {
+interface FAQDataTableProps {
+  data: FAQItem[]
+  allTags: string[]
+  pagination: PaginationInfo
+  selectedTags: string[]
+  searchValue: string
+  isLoading?: boolean
+  onEdit: (item: FAQItem) => void
+  onDelete: (item: FAQItem) => void
+  onSearchChange: (search: string) => void
+  onTagsChange: (tags: string[]) => void
+  onPageChange: (page: number) => void
+}
+
+export function FAQDataTable({
+  data,
+  allTags,
+  pagination,
+  selectedTags,
+  searchValue,
+  isLoading,
+  onEdit,
+  onDelete,
+  onSearchChange,
+  onTagsChange,
+  onPageChange,
+}: FAQDataTableProps) {
   const [sorting, setSorting] = useState<SortingState>([])
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
+  const [localSearch, setLocalSearch] = useState(searchValue)
+
+  // Sync local search with prop
+  useEffect(() => {
+    setLocalSearch(searchValue)
+  }, [searchValue])
+
+  // Debounced search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (localSearch !== searchValue) {
+        onSearchChange(localSearch)
+      }
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [localSearch, searchValue, onSearchChange])
 
   const columns: ColumnDef<FAQItem>[] = useMemo(
     () => [
@@ -76,9 +116,6 @@ export function FAQDataTable({ data, onEdit, onDelete }: FAQDataTableProps) {
               {status}
             </Badge>
           )
-        },
-        filterFn: (row, id, value) => {
-          return value.includes(row.getValue(id))
         },
       },
       {
@@ -163,27 +200,37 @@ export function FAQDataTable({ data, onEdit, onDelete }: FAQDataTableProps) {
     data,
     columns,
     onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
     getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
+    manualPagination: true,
+    pageCount: pagination.totalPages,
     state: {
       sorting,
-      columnFilters,
+      pagination: {
+        pageIndex: pagination.page - 1,
+        pageSize: pagination.limit,
+      },
     },
   })
 
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-4">
-        <Input
-          placeholder="Search FAQs..."
-          value={(table.getColumn('title')?.getFilterValue() as string) ?? ''}
-          onChange={(event) =>
-            table.getColumn('title')?.setFilterValue(event.target.value)
-          }
-          className="max-w-sm"
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search FAQs..."
+            value={localSearch}
+            onChange={(e) => setLocalSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <MultiSelect
+          options={allTags}
+          selected={selectedTags}
+          onChange={onTagsChange}
+          placeholder="Filter by tags..."
+          className="w-[200px]"
         />
       </div>
 
@@ -203,7 +250,13 @@ export function FAQDataTable({ data, onEdit, onDelete }: FAQDataTableProps) {
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows?.length ? (
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="h-24 text-center">
+                  Loading...
+                </TableCell>
+              </TableRow>
+            ) : table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
                 <TableRow key={row.id}>
                   {row.getVisibleCells().map((cell) => (
@@ -224,23 +277,31 @@ export function FAQDataTable({ data, onEdit, onDelete }: FAQDataTableProps) {
         </Table>
       </div>
 
-      <div className="flex items-center justify-end space-x-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => table.previousPage()}
-          disabled={!table.getCanPreviousPage()}
-        >
-          Previous
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => table.nextPage()}
-          disabled={!table.getCanNextPage()}
-        >
-          Next
-        </Button>
+      <div className="flex items-center justify-between px-2">
+        <div className="text-sm text-muted-foreground">
+          {pagination.total} FAQ(s) total
+        </div>
+        <div className="flex items-center space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onPageChange(pagination.page - 1)}
+            disabled={pagination.page <= 1}
+          >
+            Previous
+          </Button>
+          <div className="text-sm">
+            Page {pagination.page} of {pagination.totalPages || 1}
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onPageChange(pagination.page + 1)}
+            disabled={pagination.page >= pagination.totalPages}
+          >
+            Next
+          </Button>
+        </div>
       </div>
     </div>
   )

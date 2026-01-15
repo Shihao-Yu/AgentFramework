@@ -1,14 +1,11 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   flexRender,
   getCoreRowModel,
-  getFilteredRowModel,
-  getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
   type ColumnDef,
   type SortingState,
-  type ColumnFiltersState,
 } from '@tanstack/react-table'
 import { ArrowUpDown, MoreHorizontal, Search, Plus, Eye, Pencil, Trash2, Network } from 'lucide-react'
 
@@ -38,19 +35,34 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { MultiSelect } from '@/components/ui/multi-select'
 
 import type { KnowledgeNode, NodeType } from '@/types/graph'
 import { NodeTypeLabels, NodeTypeConfig, NodeStatus as NodeStatusEnum } from '@/types/graph'
 
+interface PaginationInfo {
+  page: number
+  limit: number
+  total: number
+  totalPages: number
+}
+
 interface NodeListProps {
   nodes: KnowledgeNode[]
   nodeType?: NodeType
+  allTags: string[]
+  pagination: PaginationInfo
+  selectedTags: string[]
+  searchValue: string
   isLoading?: boolean
   onView?: (node: KnowledgeNode) => void
   onEdit?: (node: KnowledgeNode) => void
   onDelete?: (node: KnowledgeNode) => void
   onViewInGraph?: (node: KnowledgeNode) => void
   onCreate?: () => void
+  onSearchChange: (search: string) => void
+  onTagsChange: (tags: string[]) => void
+  onPageChange: (page: number) => void
   title?: string
   description?: string
 }
@@ -104,9 +116,6 @@ function getColumns(
           </Badge>
         )
       },
-      filterFn: (row, id, value) => {
-        return value.includes(row.getValue(id))
-      },
     },
     {
       accessorKey: 'status',
@@ -126,9 +135,6 @@ function getColumns(
             {status}
           </Badge>
         )
-      },
-      filterFn: (row, id, value) => {
-        return value.includes(row.getValue(id))
       },
     },
     {
@@ -233,47 +239,58 @@ function getColumns(
 export function NodeList({
   nodes,
   nodeType,
+  allTags,
+  pagination,
+  selectedTags,
+  searchValue,
   isLoading,
   onView,
   onEdit,
   onDelete,
   onViewInGraph,
   onCreate,
+  onSearchChange,
+  onTagsChange,
+  onPageChange,
   title,
   description,
 }: NodeListProps) {
   const [sorting, setSorting] = useState<SortingState>([])
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
-  const [globalFilter, setGlobalFilter] = useState('')
+  const [localSearch, setLocalSearch] = useState(searchValue)
+
+  // Sync local search with prop
+  useEffect(() => {
+    setLocalSearch(searchValue)
+  }, [searchValue])
+
+  // Debounced search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (localSearch !== searchValue) {
+        onSearchChange(localSearch)
+      }
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [localSearch, searchValue, onSearchChange])
 
   const columns = useMemo(
     () => getColumns(onView, onEdit, onDelete, onViewInGraph),
     [onView, onEdit, onDelete, onViewInGraph]
   )
 
-  const filteredData = useMemo(() => {
-    if (!nodeType) return nodes
-    return nodes.filter((n) => n.node_type === nodeType)
-  }, [nodes, nodeType])
-
   const table = useReactTable({
-    data: filteredData,
+    data: nodes,
     columns,
     getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
     onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
-    onGlobalFilterChange: setGlobalFilter,
+    manualPagination: true,
+    pageCount: pagination.totalPages,
     state: {
       sorting,
-      columnFilters,
-      globalFilter,
-    },
-    initialState: {
       pagination: {
-        pageSize: 10,
+        pageIndex: pagination.page - 1,
+        pageSize: pagination.limit,
       },
     },
   })
@@ -301,51 +318,19 @@ export function NodeList({
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Search..."
-            value={globalFilter}
-            onChange={(e) => setGlobalFilter(e.target.value)}
+            value={localSearch}
+            onChange={(e) => setLocalSearch(e.target.value)}
             className="pl-9"
           />
         </div>
 
-        {!nodeType && (
-          <Select
-            value={(table.getColumn('node_type')?.getFilterValue() as string[])?.join(',') || 'all'}
-            onValueChange={(value) => {
-              table.getColumn('node_type')?.setFilterValue(value === 'all' ? undefined : [value])
-            }}
-          >
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Filter by type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Types</SelectItem>
-              {Object.entries(NodeTypeLabels).map(([type, label]) => (
-                <SelectItem key={type} value={type}>
-                  {label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-
-        <Select
-          value={(table.getColumn('status')?.getFilterValue() as string[])?.join(',') || 'all'}
-          onValueChange={(value) => {
-            table.getColumn('status')?.setFilterValue(value === 'all' ? undefined : [value])
-          }}
-        >
-          <SelectTrigger className="w-[150px]">
-            <SelectValue placeholder="Filter by status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            {Object.values(NodeStatusEnum).map((status) => (
-              <SelectItem key={status} value={status}>
-                {status.charAt(0).toUpperCase() + status.slice(1)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <MultiSelect
+          options={allTags}
+          selected={selectedTags}
+          onChange={onTagsChange}
+          placeholder="Filter by tags..."
+          className="w-[200px]"
+        />
       </div>
 
       <div className="rounded-md border">
@@ -393,25 +378,25 @@ export function NodeList({
 
       <div className="flex items-center justify-between px-2">
         <div className="text-sm text-muted-foreground">
-          {table.getFilteredRowModel().rows.length} node(s) total
+          {pagination.total} node(s) total
         </div>
         <div className="flex items-center space-x-2">
           <Button
             variant="outline"
             size="sm"
-            onClick={() => table.previousPage()}
-            disabled={!table.getCanPreviousPage()}
+            onClick={() => onPageChange(pagination.page - 1)}
+            disabled={pagination.page <= 1}
           >
             Previous
           </Button>
           <div className="text-sm">
-            Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
+            Page {pagination.page} of {pagination.totalPages || 1}
           </div>
           <Button
             variant="outline"
             size="sm"
-            onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage()}
+            onClick={() => onPageChange(pagination.page + 1)}
+            disabled={pagination.page >= pagination.totalPages}
           >
             Next
           </Button>

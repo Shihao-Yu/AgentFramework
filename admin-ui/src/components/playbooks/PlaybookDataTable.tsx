@@ -1,16 +1,13 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   type ColumnDef,
-  type ColumnFiltersState,
   type SortingState,
   flexRender,
   getCoreRowModel,
-  getFilteredRowModel,
-  getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table'
-import { MoreHorizontal, ArrowUpDown, Eye, Pencil, Trash2 } from 'lucide-react'
+import { MoreHorizontal, ArrowUpDown, Eye, Pencil, Trash2, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -30,26 +27,65 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { MultiSelect } from '@/components/ui/multi-select'
 import type { PlaybookItem, Domain } from '@/types/knowledge'
 import { format } from 'date-fns'
+
+interface PaginationInfo {
+  page: number
+  limit: number
+  total: number
+  totalPages: number
+}
 
 interface PlaybookDataTableProps {
   data: PlaybookItem[]
   domains: Domain[]
+  allTags: string[]
+  pagination: PaginationInfo
+  selectedTags: string[]
+  searchValue: string
+  isLoading?: boolean
   onView: (item: PlaybookItem) => void
   onEdit: (item: PlaybookItem) => void
   onDelete: (item: PlaybookItem) => void
+  onSearchChange: (search: string) => void
+  onTagsChange: (tags: string[]) => void
+  onPageChange: (page: number) => void
 }
 
 export function PlaybookDataTable({
   data,
   domains,
+  allTags,
+  pagination,
+  selectedTags,
+  searchValue,
+  isLoading,
   onView,
   onEdit,
   onDelete,
+  onSearchChange,
+  onTagsChange,
+  onPageChange,
 }: PlaybookDataTableProps) {
   const [sorting, setSorting] = useState<SortingState>([])
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
+  const [localSearch, setLocalSearch] = useState(searchValue)
+
+  // Sync local search with prop
+  useEffect(() => {
+    setLocalSearch(searchValue)
+  }, [searchValue])
+
+  // Debounced search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (localSearch !== searchValue) {
+        onSearchChange(localSearch)
+      }
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [localSearch, searchValue, onSearchChange])
 
   const getDomainName = (domainId: string) => {
     const domain = domains.find((d) => d.id === domainId)
@@ -89,9 +125,6 @@ export function PlaybookDataTable({
               {getDomainName(domain)}
             </Badge>
           )
-        },
-        filterFn: (row, _id, value) => {
-          return value.includes(row.original.content.domain)
         },
       },
       {
@@ -203,27 +236,37 @@ export function PlaybookDataTable({
     data,
     columns,
     onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
     getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
+    manualPagination: true,
+    pageCount: pagination.totalPages,
     state: {
       sorting,
-      columnFilters,
+      pagination: {
+        pageIndex: pagination.page - 1,
+        pageSize: pagination.limit,
+      },
     },
   })
 
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-4">
-        <Input
-          placeholder="Search playbooks..."
-          value={(table.getColumn('title')?.getFilterValue() as string) ?? ''}
-          onChange={(event) =>
-            table.getColumn('title')?.setFilterValue(event.target.value)
-          }
-          className="max-w-sm"
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search playbooks..."
+            value={localSearch}
+            onChange={(e) => setLocalSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <MultiSelect
+          options={allTags}
+          selected={selectedTags}
+          onChange={onTagsChange}
+          placeholder="Filter by tags..."
+          className="w-[200px]"
         />
       </div>
 
@@ -243,7 +286,13 @@ export function PlaybookDataTable({
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows?.length ? (
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="h-24 text-center">
+                  Loading...
+                </TableCell>
+              </TableRow>
+            ) : table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
                 <TableRow key={row.id}>
                   {row.getVisibleCells().map((cell) => (
@@ -264,23 +313,31 @@ export function PlaybookDataTable({
         </Table>
       </div>
 
-      <div className="flex items-center justify-end space-x-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => table.previousPage()}
-          disabled={!table.getCanPreviousPage()}
-        >
-          Previous
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => table.nextPage()}
-          disabled={!table.getCanNextPage()}
-        >
-          Next
-        </Button>
+      <div className="flex items-center justify-between px-2">
+        <div className="text-sm text-muted-foreground">
+          {pagination.total} playbook(s) total
+        </div>
+        <div className="flex items-center space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onPageChange(pagination.page - 1)}
+            disabled={pagination.page <= 1}
+          >
+            Previous
+          </Button>
+          <div className="text-sm">
+            Page {pagination.page} of {pagination.totalPages || 1}
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onPageChange(pagination.page + 1)}
+            disabled={pagination.page >= pagination.totalPages}
+          >
+            Next
+          </Button>
+        </div>
       </div>
     </div>
   )

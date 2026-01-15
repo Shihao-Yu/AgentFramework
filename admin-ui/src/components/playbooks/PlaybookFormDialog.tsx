@@ -129,7 +129,7 @@ export function PlaybookFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col gap-0">
+      <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col gap-0">
         <DialogHeader className="pb-4 border-b">
           <DialogTitle>{isEditing ? 'Edit Playbook' : 'Create New Playbook'}</DialogTitle>
           <DialogDescription>

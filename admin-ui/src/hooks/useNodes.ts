@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import { apiRequest } from '@/lib/api'
 import type {
   KnowledgeNode,
@@ -79,23 +79,41 @@ interface NodeSearchResponse {
   limit: number
 }
 
+interface PaginationInfo {
+  page: number
+  limit: number
+  total: number
+  totalPages: number
+}
+
+const DEFAULT_LIMIT = 100
+
 export function useNodes(initialFilters: NodeFilters = {}) {
   const [nodes, setNodes] = useState<KnowledgeNode[]>([])
   const [total, setTotal] = useState(0)
+  const [allTags, setAllTags] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [filters, setFilters] = useState<NodeFilters>(initialFilters)
+  const [filters, setFilters] = useState<NodeFilters>({
+    page: 1,
+    limit: DEFAULT_LIMIT,
+    ...initialFilters,
+  })
+  const [pagination, setPagination] = useState<PaginationInfo>({
+    page: 1,
+    limit: DEFAULT_LIMIT,
+    total: 0,
+    totalPages: 0,
+  })
 
   const paginatedResponse = useMemo((): NodeListResponse => {
-    const page = filters.page || 1
-    const limit = filters.limit || 20
     return {
       items: nodes,
-      total,
-      page,
-      pages: Math.ceil(total / limit),
+      total: pagination.total,
+      page: pagination.page,
+      pages: pagination.totalPages,
     }
-  }, [nodes, total, filters.page, filters.limit])
+  }, [nodes, pagination])
 
   const fetchNodes = useCallback(async (currentFilters?: NodeFilters) => {
     const f = currentFilters || filters
@@ -105,7 +123,7 @@ export function useNodes(initialFilters: NodeFilters = {}) {
     try {
       const params: Record<string, string | number | boolean | string[] | undefined> = {
         page: f.page || 1,
-        limit: f.limit || 20,
+        limit: f.limit || DEFAULT_LIMIT,
       }
       
       if (f.tenant_ids && f.tenant_ids.length > 0) {
@@ -120,8 +138,8 @@ export function useNodes(initialFilters: NodeFilters = {}) {
       if (f.status && f.status.length > 0) {
         params.status = f.status[0] // API takes single status
       }
-      if (f.search) {
-        params.search = f.search
+      if (f.search && f.search.trim()) {
+        params.search = f.search.trim()
       }
       if (f.dataset_name) {
         params.dataset_name = f.dataset_name
@@ -131,6 +149,22 @@ export function useNodes(initialFilters: NodeFilters = {}) {
       
       setNodes(response.data)
       setTotal(response.total)
+      setPagination({
+        page: response.page,
+        limit: response.limit,
+        total: response.total,
+        totalPages: response.total_pages,
+      })
+      
+      // Collect all unique tags from results
+      const tagsFromResults = new Set<string>()
+      response.data.forEach(node => {
+        node.tags.forEach(tag => tagsFromResults.add(tag))
+      })
+      setAllTags(prev => {
+        const merged = new Set([...prev, ...tagsFromResults])
+        return Array.from(merged).sort()
+      })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch nodes'
       setError(message)
@@ -139,6 +173,35 @@ export function useNodes(initialFilters: NodeFilters = {}) {
       setIsLoading(false)
     }
   }, [filters])
+
+  // Fetch all tags on mount
+  const fetchAllTags = useCallback(async () => {
+    try {
+      const params: Record<string, string | string[] | number> = {
+        limit: 1000,
+      }
+      if (filters.node_types && filters.node_types.length > 0) {
+        params.node_types = filters.node_types
+      }
+      if (filters.tenant_ids && filters.tenant_ids.length > 0) {
+        params.tenant_ids = filters.tenant_ids
+      }
+      const response = await apiRequest<ApiNodeListResponse>('/api/nodes', { params })
+      const tags = new Set<string>()
+      response.data.forEach(node => {
+        node.tags.forEach(tag => tags.add(tag))
+      })
+      setAllTags(Array.from(tags).sort())
+    } catch (err) {
+      console.error('Failed to fetch tags:', err)
+    }
+  }, [filters.node_types, filters.tenant_ids])
+
+  // Initial fetch
+  useEffect(() => {
+    fetchNodes()
+    fetchAllTags()
+  }, [])
 
   const getNode = useCallback(async (id: number): Promise<NodeDetailResponse | null> => {
     try {
@@ -191,7 +254,7 @@ export function useNodes(initialFilters: NodeFilters = {}) {
     try {
       const params: Record<string, string | number | string[] | undefined> = {
         q: query,
-        limit: options?.limit || 20,
+        limit: options?.limit || DEFAULT_LIMIT,
       }
       
       if (options?.node_types && options.node_types.length > 0) {
@@ -276,6 +339,7 @@ export function useNodes(initialFilters: NodeFilters = {}) {
       // Update local state
       setNodes(prev => prev.filter(node => node.id !== id))
       setTotal(prev => prev - 1)
+      setPagination(prev => ({ ...prev, total: prev.total - 1 }))
       
       return true
     } catch (err) {
@@ -291,7 +355,10 @@ export function useNodes(initialFilters: NodeFilters = {}) {
   const updateFilters = useCallback((newFilters: Partial<NodeFilters>) => {
     setFilters(prev => {
       const updated = { ...prev, ...newFilters }
-      // Auto-fetch when filters change
+      // Reset to page 1 when search or tags change
+      if (newFilters.search !== undefined || newFilters.tags !== undefined) {
+        updated.page = 1
+      }
       fetchNodes(updated)
       return updated
     })
@@ -299,6 +366,8 @@ export function useNodes(initialFilters: NodeFilters = {}) {
 
   return {
     nodes,
+    allTags,
+    pagination,
     response: paginatedResponse,
     isLoading,
     error,
@@ -314,26 +383,44 @@ export function useNodes(initialFilters: NodeFilters = {}) {
 }
 
 export function useNodesByType(nodeType: NodeType, tenantIds: string[] = []) {
-  const { nodes, isLoading, error, createNode, updateNode, deleteNode, fetchNodes } = useNodes({
+  const { 
+    nodes, 
+    allTags,
+    pagination,
+    isLoading, 
+    error, 
+    filters,
+    createNode, 
+    updateNode, 
+    deleteNode, 
+    updateFilters,
+    fetchNodes 
+  } = useNodes({
     node_types: [nodeType],
     tenant_ids: tenantIds.length > 0 ? tenantIds : undefined,
+    limit: DEFAULT_LIMIT,
   })
 
   // Fetch on mount and when dependencies change
   const refetch = useCallback(() => {
     fetchNodes({
+      ...filters,
       node_types: [nodeType],
       tenant_ids: tenantIds.length > 0 ? tenantIds : undefined,
     })
-  }, [fetchNodes, nodeType, tenantIds])
+  }, [fetchNodes, nodeType, tenantIds, filters])
 
   return {
     nodes,
+    allTags,
+    pagination,
+    filters,
     isLoading,
     error,
     createNode,
     updateNode,
     deleteNode,
+    updateFilters,
     refetch,
   }
 }

@@ -18,7 +18,19 @@ import { usePermissions } from '@/hooks/usePermissions'
 import type { PermissionItem, PermissionFormData } from '@/types/knowledge'
 
 export function PermissionsPage() {
-  const { items, existingPermissions, existingRoles, createItem, updateItem, deleteItem } = usePermissions()
+  const { 
+    items, 
+    allTags,
+    pagination,
+    filters,
+    isLoading,
+    existingPermissions, 
+    existingRoles, 
+    createItem, 
+    updateItem, 
+    deleteItem,
+    updateFilters,
+  } = usePermissions()
   const [formOpen, setFormOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<PermissionItem | null>(null)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
@@ -63,7 +75,18 @@ export function PermissionsPage() {
     [editingItem, createItem, updateItem]
   )
 
-  const totalCount = items.length
+  const handleSearchChange = useCallback((search: string) => {
+    updateFilters({ search })
+  }, [updateFilters])
+
+  const handleTagsChange = useCallback((tags: string[]) => {
+    updateFilters({ tags })
+  }, [updateFilters])
+
+  const handlePageChange = useCallback((page: number) => {
+    updateFilters({ page })
+  }, [updateFilters])
+
   const publishedCount = items.filter((i) => i.status === 'published').length
   const uniqueRolesCount = existingRoles.length
 
@@ -88,7 +111,7 @@ export function PermissionsPage() {
             <CardTitle className="text-sm font-medium">Total Features</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalCount}</div>
+            <div className="text-2xl font-bold">{pagination.total}</div>
           </CardContent>
         </Card>
         <Card>
@@ -119,9 +142,17 @@ export function PermissionsPage() {
         <CardContent>
           <PermissionDataTable
             data={items}
+            allTags={allTags}
+            pagination={pagination}
+            selectedTags={filters.tags || []}
+            searchValue={filters.search || ''}
+            isLoading={isLoading}
             onView={handleView}
             onEdit={handleEdit}
             onDelete={handleDeleteClick}
+            onSearchChange={handleSearchChange}
+            onTagsChange={handleTagsChange}
+            onPageChange={handlePageChange}
           />
         </CardContent>
       </Card>

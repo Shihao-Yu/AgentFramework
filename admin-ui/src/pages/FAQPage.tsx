@@ -15,7 +15,17 @@ import { useFAQs } from '@/hooks/useFAQ'
 import type { FAQItem, FAQFormData } from '@/types/knowledge'
 
 export function FAQPage() {
-  const { items, createItem, updateItem, deleteItem } = useFAQs()
+  const { 
+    items, 
+    allTags,
+    pagination,
+    filters,
+    isLoading,
+    createItem, 
+    updateItem, 
+    deleteItem,
+    updateFilters,
+  } = useFAQs()
   const [formOpen, setFormOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<FAQItem | null>(null)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
@@ -55,7 +65,18 @@ export function FAQPage() {
     [editingItem, createItem, updateItem]
   )
 
-  const totalCount = items.length
+  const handleSearchChange = useCallback((search: string) => {
+    updateFilters({ search })
+  }, [updateFilters])
+
+  const handleTagsChange = useCallback((tags: string[]) => {
+    updateFilters({ tags })
+  }, [updateFilters])
+
+  const handlePageChange = useCallback((page: number) => {
+    updateFilters({ page })
+  }, [updateFilters])
+
   const publishedCount = items.filter((i) => i.status === 'published').length
   const draftCount = items.filter((i) => i.status === 'draft').length
 
@@ -80,7 +101,7 @@ export function FAQPage() {
             <CardTitle className="text-sm font-medium">Total FAQs</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalCount}</div>
+            <div className="text-2xl font-bold">{pagination.total}</div>
           </CardContent>
         </Card>
         <Card>
@@ -111,8 +132,16 @@ export function FAQPage() {
         <CardContent>
           <FAQDataTable
             data={items}
+            allTags={allTags}
+            pagination={pagination}
+            selectedTags={filters.tags || []}
+            searchValue={filters.search || ''}
+            isLoading={isLoading}
             onEdit={handleEdit}
             onDelete={handleDeleteClick}
+            onSearchChange={handleSearchChange}
+            onTagsChange={handleTagsChange}
+            onPageChange={handlePageChange}
           />
         </CardContent>
       </Card>

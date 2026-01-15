@@ -17,8 +17,19 @@ import { usePlaybooks } from '@/hooks/usePlaybooks'
 import type { PlaybookItem, PlaybookFormData } from '@/types/knowledge'
 
 export function PlaybooksPage() {
-  const { items, domains, createItem, updateItem, deleteItem, addCustomDomain } =
-    usePlaybooks()
+  const { 
+    items, 
+    domains, 
+    allTags,
+    pagination,
+    filters,
+    isLoading,
+    createItem, 
+    updateItem, 
+    deleteItem, 
+    updateFilters,
+    addCustomDomain 
+  } = usePlaybooks()
   const [formOpen, setFormOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<PlaybookItem | null>(null)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
@@ -63,13 +74,24 @@ export function PlaybooksPage() {
     [editingItem, createItem, updateItem]
   )
 
+  const handleSearchChange = useCallback((search: string) => {
+    updateFilters({ search })
+  }, [updateFilters])
+
+  const handleTagsChange = useCallback((tags: string[]) => {
+    updateFilters({ tags })
+  }, [updateFilters])
+
+  const handlePageChange = useCallback((page: number) => {
+    updateFilters({ page })
+  }, [updateFilters])
+
   const getDomainName = (domainId: string) => {
     const domain = domains.find((d) => d.id === domainId)
     return domain?.name || domainId
   }
 
   // Stats
-  const totalCount = items.length
   const publishedCount = items.filter((i) => i.status === 'published').length
   const uniqueDomains = new Set(items.map((i) => i.content.domain)).size
 
@@ -96,7 +118,7 @@ export function PlaybooksPage() {
             <CardTitle className="text-sm font-medium">Total Playbooks</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalCount}</div>
+            <div className="text-2xl font-bold">{pagination.total}</div>
           </CardContent>
         </Card>
         <Card>
@@ -129,9 +151,17 @@ export function PlaybooksPage() {
           <PlaybookDataTable
             data={items}
             domains={domains}
+            allTags={allTags}
+            pagination={pagination}
+            selectedTags={filters.tags || []}
+            searchValue={filters.search || ''}
+            isLoading={isLoading}
             onView={handleView}
             onEdit={handleEdit}
             onDelete={handleDeleteClick}
+            onSearchChange={handleSearchChange}
+            onTagsChange={handleTagsChange}
+            onPageChange={handlePageChange}
           />
         </CardContent>
       </Card>

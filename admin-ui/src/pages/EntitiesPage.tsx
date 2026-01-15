@@ -9,7 +9,15 @@ import { NodeType, type KnowledgeNode } from '@/types/graph'
 export function EntitiesPage() {
   const navigate = useNavigate()
   const { selectedTenantIds } = useTenantContext()
-  const { nodes, isLoading, deleteNode } = useNodes({
+  const { 
+    nodes, 
+    allTags,
+    pagination,
+    filters,
+    isLoading, 
+    deleteNode,
+    updateFilters,
+  } = useNodes({
     node_types: [NodeType.ENTITY],
     tenant_ids: selectedTenantIds,
   })
@@ -36,16 +44,35 @@ export function EntitiesPage() {
     console.log('Create new entity')
   }, [])
 
+  const handleSearchChange = useCallback((search: string) => {
+    updateFilters({ search })
+  }, [updateFilters])
+
+  const handleTagsChange = useCallback((tags: string[]) => {
+    updateFilters({ tags })
+  }, [updateFilters])
+
+  const handlePageChange = useCallback((page: number) => {
+    updateFilters({ page })
+  }, [updateFilters])
+
   return (
     <NodeList
       nodes={nodes}
       nodeType={NodeType.ENTITY}
+      allTags={allTags}
+      pagination={pagination}
+      selectedTags={filters.tags || []}
+      searchValue={filters.search || ''}
       isLoading={isLoading}
       onView={handleView}
       onEdit={handleEdit}
       onDelete={handleDelete}
       onViewInGraph={handleViewInGraph}
       onCreate={handleCreate}
+      onSearchChange={handleSearchChange}
+      onTagsChange={handleTagsChange}
+      onPageChange={handlePageChange}
       title="Entities"
       description="Business domain models that map to technical schemas"
     />
