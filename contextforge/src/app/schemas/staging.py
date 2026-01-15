@@ -48,3 +48,10 @@ class StagingReviewResponse(BaseModel):
     staging_id: int
     created_item_id: Optional[int] = None
     message: str
+
+
+class StagingCountsResponse(BaseModel):
+    new: int
+    merge: int
+    add_variant: int
+    total: int

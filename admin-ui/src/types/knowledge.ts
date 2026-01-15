@@ -321,21 +321,20 @@ export interface KnowledgeRelationship {
 
 export interface StagingKnowledgeItem {
   id: number
-  knowledge_type: string
-  category_id?: number
+  node_type: string
+  tenant_id: string
   title: string
-  summary?: string
   content: Record<string, unknown>
   tags: string[]
-  source_ticket_id?: string
-  confidence: number
   status: 'pending' | 'approved' | 'rejected'
   action: 'new' | 'merge' | 'add_variant'
   merge_with_id?: number
-  similarity: number
+  similarity?: number
+  source?: string
+  source_reference?: string
+  confidence?: number
   created_at: string
-  approved_by?: string
-  approved_at?: string
+  created_by?: string
   reviewed_by?: string
   reviewed_at?: string
   review_notes?: string

@@ -19,18 +19,18 @@ import {
 } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useStaging } from '@/hooks/useStaging'
+import { 
+  StagingContentPreview, 
+  StagingEditForm, 
+  getNodeTypeLabel, 
+  getNodeTypeBadgeColor,
+  type StagingEditData
+} from '@/components/staging'
 import type { StagingKnowledgeItem } from '@/types/knowledge'
 import { format } from 'date-fns'
-
-interface FAQContent {
-  question: string
-  answer: string
-}
 
 export function StagingQueuePage() {
   const {
@@ -44,33 +44,51 @@ export function StagingQueuePage() {
 
   const [selectedItem, setSelectedItem] = useState<StagingKnowledgeItem | null>(null)
   const [rejectReason, setRejectReason] = useState('')
-  const [editedData, setEditedData] = useState({
+  const [editedData, setEditedData] = useState<StagingEditData>({
     title: '',
-    question: '',
-    answer: '',
+    content: {},
+    tags: [],
   })
+  const [mergeTarget, setMergeTarget] = useState<{ id: number; title: string; content: Record<string, unknown> } | null>(null)
 
-  const handleOpenReview = useCallback((item: StagingKnowledgeItem) => {
+  const handleOpenReview = useCallback(async (item: StagingKnowledgeItem) => {
     setSelectedItem(item)
-    const content = item.content as unknown as FAQContent
     setEditedData({
       title: item.title,
-      question: content.question || '',
-      answer: content.answer || '',
+      content: { ...item.content },
+      tags: [...item.tags],
     })
     setRejectReason('')
-  }, [])
+    
+    // Fetch merge target if applicable
+    if (item.merge_with_id) {
+      const target = await getMergeTarget(item)
+      if (target) {
+        setMergeTarget({
+          id: target.id,
+          title: target.title,
+          content: target.content,
+        })
+      } else {
+        setMergeTarget(null)
+      }
+    } else {
+      setMergeTarget(null)
+    }
+  }, [getMergeTarget])
 
   const handleApprove = useCallback(async () => {
     if (!selectedItem) return
     await editAndApprove(selectedItem.id, editedData)
     setSelectedItem(null)
+    setMergeTarget(null)
   }, [selectedItem, editedData, editAndApprove])
 
   const handleReject = useCallback(async () => {
     if (!selectedItem) return
     await rejectItem(selectedItem.id, rejectReason)
     setSelectedItem(null)
+    setMergeTarget(null)
   }, [selectedItem, rejectReason, rejectItem])
 
   const getActionBadge = (action: string) => {
@@ -150,10 +168,10 @@ export function StagingQueuePage() {
                   {tabValue === 'all'
                     ? 'All items awaiting review'
                     : tabValue === 'new'
-                    ? 'New FAQ entries from tickets'
+                    ? 'New entries from tickets'
                     : tabValue === 'merge'
-                    ? 'Updates to merge with existing FAQs'
-                    : 'New question variants to add'}
+                    ? 'Updates to merge with existing items'
+                    : 'New variants to add'}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -167,40 +185,46 @@ export function StagingQueuePage() {
                       return true
                     })
                     .map((item) => {
-    const content = item.content as unknown as FAQContent
-                      const mergeTarget = getMergeTarget(item)
-
                       return (
                         <div
                           key={item.id}
                           className="flex items-start justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors"
                         >
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              {/* Node Type Badge */}
+                              <Badge className={getNodeTypeBadgeColor(item.node_type)}>
+                                {getNodeTypeLabel(item.node_type)}
+                              </Badge>
                               {getActionBadge(item.action)}
-                              {item.similarity && (
+                              {item.similarity !== undefined && item.similarity !== null && (
                                 <Badge variant="outline">
                                   {Math.round(item.similarity * 100)}% match
                                 </Badge>
                               )}
-                              {item.confidence && (
+                              {item.confidence !== undefined && item.confidence !== null && (
                                 <Badge variant="secondary">
                                   {Math.round(item.confidence * 100)}% confidence
                                 </Badge>
                               )}
                             </div>
                             <h4 className="font-medium truncate">{item.title}</h4>
-                            <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
-                              {content.question}
-                            </p>
-                            {mergeTarget && (
+                            <div className="mt-1">
+                              <StagingContentPreview item={item} />
+                            </div>
+                            {item.merge_with_id && (
                               <div className="mt-2 text-sm">
-                                <span className="text-muted-foreground">Merge with: </span>
-                                <span className="font-medium">{mergeTarget.title}</span>
+                                <span className="text-muted-foreground">Merge with ID: </span>
+                                <span className="font-medium">#{item.merge_with_id}</span>
                               </div>
                             )}
                             <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                              <span>Source: {item.source_ticket_id}</span>
+                              {item.source_reference && (
+                                <span>Source: {item.source_reference}</span>
+                              )}
+                              {item.source && (
+                                <span>Via: {item.source}</span>
+                              )}
                               <span>{format(new Date(item.created_at), 'MMM d, yyyy HH:mm')}</span>
                             </div>
                           </div>
@@ -253,16 +277,23 @@ export function StagingQueuePage() {
       </Tabs>
 
       {/* Review Dialog */}
-      <Dialog open={!!selectedItem} onOpenChange={() => setSelectedItem(null)}>
+      <Dialog open={!!selectedItem} onOpenChange={() => { setSelectedItem(null); setMergeTarget(null) }}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
-            <DialogTitle>Review & Edit</DialogTitle>
+            <div className="flex items-center gap-2">
+              {selectedItem && (
+                <Badge className={getNodeTypeBadgeColor(selectedItem.node_type)}>
+                  {getNodeTypeLabel(selectedItem.node_type)}
+                </Badge>
+              )}
+              <DialogTitle>Review & Edit</DialogTitle>
+            </div>
             <DialogDescription>
               {selectedItem?.action === 'new'
-                ? 'Review and edit this new FAQ entry before publishing.'
+                ? `Review and edit this new ${getNodeTypeLabel(selectedItem?.node_type || '')} entry before publishing.`
                 : selectedItem?.action === 'merge'
-                ? 'Review and approve merging this content with an existing FAQ.'
-                : 'Review this question variant before adding.'}
+                ? `Review and approve merging this content with an existing ${getNodeTypeLabel(selectedItem?.node_type || '')}.`
+                : 'Review this variant before adding.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -270,16 +301,16 @@ export function StagingQueuePage() {
             {selectedItem && (
               <div className="space-y-6">
                 {/* Merge Target Comparison */}
-                {selectedItem.action === 'merge' && getMergeTarget(selectedItem) && (
+                {selectedItem.action === 'merge' && mergeTarget && (
                   <div className="rounded-lg border p-4 bg-purple-50 dark:bg-purple-950">
                     <h4 className="font-medium mb-2 flex items-center gap-2">
                       <GitMerge className="h-4 w-4" />
-                      Existing FAQ to Merge With
+                      Existing Item to Merge With
                     </h4>
                     <div className="text-sm">
-                      <p className="font-medium">{getMergeTarget(selectedItem)?.title}</p>
+                      <p className="font-medium">{mergeTarget.title}</p>
                       <p className="text-muted-foreground mt-1">
-                        {(getMergeTarget(selectedItem)?.content as unknown as FAQContent)?.answer?.slice(0, 200)}...
+                        {JSON.stringify(mergeTarget.content).slice(0, 200)}...
                       </p>
                     </div>
                   </div>
@@ -287,70 +318,44 @@ export function StagingQueuePage() {
 
                 <Separator />
 
-                {/* Content */}
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Title</Label>
-                    <Input
-                      value={editedData.title}
-                      onChange={(e) =>
-                        setEditedData((prev) => ({ ...prev, title: e.target.value }))
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Question</Label>
-                    <Textarea
-                      value={editedData.question}
-                      onChange={(e) =>
-                        setEditedData((prev) => ({ ...prev, question: e.target.value }))
-                      }
-                      className="min-h-[100px]"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Answer</Label>
-                    <Textarea
-                      value={editedData.answer}
-                      onChange={(e) =>
-                        setEditedData((prev) => ({ ...prev, answer: e.target.value }))
-                      }
-                      className="min-h-[200px]"
-                    />
-                  </div>
-                </div>
-
-                {/* Tags */}
-                <div>
-                  <h4 className="font-medium mb-2">Tags</h4>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedItem.tags.map((tag) => (
-                      <Badge key={tag} variant="secondary">
-                        {tag}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
+                {/* Dynamic Edit Form based on node_type */}
+                <StagingEditForm
+                  item={selectedItem}
+                  editedData={editedData}
+                  onChange={setEditedData}
+                />
 
                 {/* Metadata */}
                 <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">Source Ticket: </span>
-                    <span className="font-medium">{selectedItem.source_ticket_id}</span>
-                  </div>
+                  {selectedItem.source_reference && (
+                    <div>
+                      <span className="text-muted-foreground">Source Reference: </span>
+                      <span className="font-medium">{selectedItem.source_reference}</span>
+                    </div>
+                  )}
+                  {selectedItem.source && (
+                    <div>
+                      <span className="text-muted-foreground">Source: </span>
+                      <span className="font-medium">{selectedItem.source}</span>
+                    </div>
+                  )}
                   <div>
                     <span className="text-muted-foreground">Confidence: </span>
                     <span className="font-medium">
-                      {selectedItem.confidence
+                      {selectedItem.confidence !== undefined && selectedItem.confidence !== null
                         ? `${Math.round(selectedItem.confidence * 100)}%`
                         : 'N/A'}
                     </span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Node Type: </span>
+                    <span className="font-medium">{getNodeTypeLabel(selectedItem.node_type)}</span>
                   </div>
                 </div>
 
                 {/* Reject Reason */}
                 <div className="space-y-2">
-                  <Label>Rejection Reason (optional)</Label>
+                  <label className="text-sm font-medium">Rejection Reason (optional)</label>
                   <Textarea
                     placeholder="Provide a reason if rejecting..."
                     value={rejectReason}
@@ -362,7 +367,7 @@ export function StagingQueuePage() {
           </ScrollArea>
 
           <DialogFooter className="mt-4 flex gap-2">
-            <Button variant="outline" onClick={() => setSelectedItem(null)}>
+            <Button variant="outline" onClick={() => { setSelectedItem(null); setMergeTarget(null) }}>
               Cancel
             </Button>
             <Button variant="destructive" onClick={handleReject}>

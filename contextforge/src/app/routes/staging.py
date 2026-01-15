@@ -13,6 +13,7 @@ from app.schemas.staging import (
     StagingApproveRequest,
     StagingRejectRequest,
     StagingReviewResponse,
+    StagingCountsResponse,
 )
 
 
@@ -28,6 +29,20 @@ async def get_user_tenant_ids(session: AsyncSession, user_id: str) -> List[str]:
     if "shared" not in tenants:
         tenants.append("shared")
     return tenants
+
+
+@router.get("/counts", response_model=StagingCountsResponse)
+async def get_staging_counts(
+    session: AsyncSession = Depends(get_session),
+    current_user: dict = Depends(get_current_user),
+):
+    user_id = current_user.get("user_id", "anonymous")
+    user_tenant_ids = await get_user_tenant_ids(session, user_id)
+    
+    service = StagingService(session, user_tenant_ids)
+    counts = await service.get_counts()
+    
+    return StagingCountsResponse(**counts)
 
 
 @router.get("", response_model=StagingListResponse)

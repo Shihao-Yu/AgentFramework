@@ -137,3 +137,30 @@ class StagingService:
         await self.session.commit()
         
         return True, "Item rejected"
+
+    async def get_counts(self) -> Dict[str, int]:
+        base_filter = [
+            StagingNode.tenant_id.in_(self.user_tenant_ids),
+            StagingNode.status == "pending",
+        ]
+        
+        new_query = select(func.count(StagingNode.id)).where(
+            *base_filter, StagingNode.action == "new"
+        )
+        merge_query = select(func.count(StagingNode.id)).where(
+            *base_filter, StagingNode.action == "merge"
+        )
+        variant_query = select(func.count(StagingNode.id)).where(
+            *base_filter, StagingNode.action == "add_variant"
+        )
+        
+        new_count = (await self.session.execute(new_query)).scalar() or 0
+        merge_count = (await self.session.execute(merge_query)).scalar() or 0
+        variant_count = (await self.session.execute(variant_query)).scalar() or 0
+        
+        return {
+            "new": new_count,
+            "merge": merge_count,
+            "add_variant": variant_count,
+            "total": new_count + merge_count + variant_count,
+        }
