@@ -12,6 +12,7 @@ from app.routes.metrics import router as metrics_router
 from app.routes.settings import router as settings_router
 from app.routes.health import router as health_router
 from app.routes.onboarding import router as onboarding_router
+from app.routes.staging import router as staging_router
 
 __all__ = [
     "nodes_router",
@@ -26,4 +27,5 @@ __all__ = [
     "settings_router",
     "health_router",
     "onboarding_router",
+    "staging_router",
 ]

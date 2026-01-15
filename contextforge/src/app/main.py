@@ -31,6 +31,7 @@ from app.routes import (
     settings_router,
     health_router,
     onboarding_router,
+    staging_router,
 )
 
 
@@ -109,6 +110,7 @@ app.include_router(search_router, prefix="/api")
 app.include_router(metrics_router, prefix="/api")
 app.include_router(settings_router, prefix="/api")
 app.include_router(onboarding_router, prefix="/api")
+app.include_router(staging_router, prefix="/api")
 app.include_router(health_router)
 
 
