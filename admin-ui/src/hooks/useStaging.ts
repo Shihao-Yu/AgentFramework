@@ -1,6 +1,5 @@
 import { useState, useCallback, useMemo, useEffect } from 'react'
-import { apiRequest, shouldUseMock, delay } from '@/lib/api'
-import { mockStagingItems, mockKnowledgeItems } from '@/data/mock-data'
+import { apiRequest, delay } from '@/lib/api'
 import type { StagingKnowledgeItem, LegacyKnowledgeItem } from '@/types/knowledge'
 
 interface StagingListResponse {
@@ -15,6 +14,13 @@ interface StagingReviewResponse {
   staging_id: number
   created_item_id?: number
   message: string
+}
+
+interface MergeTargetResponse {
+  id: number
+  title: string
+  content: Record<string, unknown>
+  tags: string[]
 }
 
 export function useStaging() {
@@ -35,11 +41,6 @@ export function useStaging() {
   }, [pendingItems])
 
   const fetchItems = useCallback(async () => {
-    if (shouldUseMock()) {
-      setItems(mockStagingItems)
-      return
-    }
-
     setIsLoading(true)
     setError(null)
     
@@ -61,9 +62,27 @@ export function useStaging() {
     fetchItems()
   }, [fetchItems])
 
-  const getMergeTarget = useCallback((stagingItem: StagingKnowledgeItem): LegacyKnowledgeItem | undefined => {
+  const getMergeTarget = useCallback(async (stagingItem: StagingKnowledgeItem): Promise<LegacyKnowledgeItem | undefined> => {
     if (!stagingItem.merge_with_id) return undefined
-    return mockKnowledgeItems.find((i) => i.id === stagingItem.merge_with_id)
+    
+    try {
+      const response = await apiRequest<MergeTargetResponse>(`/api/nodes/${stagingItem.merge_with_id}`)
+      return {
+        id: response.id,
+        knowledge_type: 'faq',
+        title: response.title,
+        content: response.content,
+        tags: response.tags,
+        visibility: 'internal',
+        status: 'published',
+        created_at: new Date().toISOString(),
+        variants_count: 0,
+        relationships_count: 0,
+        hits_count: 0,
+      }
+    } catch {
+      return undefined
+    }
   }, [])
 
   const approveItem = useCallback(async (
@@ -72,25 +91,6 @@ export function useStaging() {
       editedContent?: Partial<StagingKnowledgeItem>
     }
   ): Promise<void> => {
-    if (shouldUseMock()) {
-      await delay(500)
-      setItems((prev) =>
-        prev.map((item) => {
-          if (item.id === id) {
-            return {
-              ...item,
-              ...(options?.editedContent || {}),
-              status: 'approved',
-              reviewed_by: 'current-user',
-              reviewed_at: new Date().toISOString(),
-            }
-          }
-          return item
-        })
-      )
-      return
-    }
-
     setIsLoading(true)
     setError(null)
     
@@ -111,25 +111,6 @@ export function useStaging() {
   }, [])
 
   const rejectItem = useCallback(async (id: number, reason?: string): Promise<void> => {
-    if (shouldUseMock()) {
-      await delay(300)
-      setItems((prev) =>
-        prev.map((item) => {
-          if (item.id === id) {
-            return {
-              ...item,
-              status: 'rejected',
-              reviewed_by: 'current-user',
-              reviewed_at: new Date().toISOString(),
-              review_notes: reason,
-            }
-          }
-          return item
-        })
-      )
-      return
-    }
-
     setIsLoading(true)
     setError(null)
     
@@ -158,34 +139,6 @@ export function useStaging() {
       tags?: string[]
     }
   ): Promise<void> => {
-    if (shouldUseMock()) {
-      await delay(500)
-      setItems((prev) =>
-        prev.map((item): StagingKnowledgeItem => {
-          if (item.id === id) {
-            const currentContent = item.content as Record<string, unknown>
-            const newContent = {
-              ...currentContent,
-              ...(editedData.question ? { question: editedData.question } : {}),
-              ...(editedData.answer ? { answer: editedData.answer } : {}),
-            }
-
-            return {
-              ...item,
-              title: editedData.title || item.title,
-              content: newContent,
-              tags: editedData.tags || item.tags,
-              status: 'approved' as const,
-              reviewed_by: 'current-user',
-              reviewed_at: new Date().toISOString(),
-            }
-          }
-          return item
-        })
-      )
-      return
-    }
-
     setIsLoading(true)
     setError(null)
     

@@ -158,6 +158,7 @@ class NodeCreate(BaseModel):
     status: KnowledgeStatus = KnowledgeStatus.DRAFT
     source: str = "manual"
     source_reference: Optional[str] = None
+    metadata_: Dict[str, Any] = Field(default={})
 
     @field_validator("content")
     @classmethod
@@ -194,6 +195,7 @@ class NodeUpdate(BaseModel):
     data_type: Optional[str] = None
     visibility: Optional[Visibility] = None
     status: Optional[KnowledgeStatus] = None
+    metadata_: Optional[Dict[str, Any]] = None
 
 
 class NodeResponse(BaseModel):
@@ -212,6 +214,7 @@ class NodeResponse(BaseModel):
     source: str
     source_reference: Optional[str] = None
     version: int
+    metadata_: Dict[str, Any] = Field(default={})
     created_by: Optional[str] = None
     created_at: datetime
     updated_by: Optional[str] = None

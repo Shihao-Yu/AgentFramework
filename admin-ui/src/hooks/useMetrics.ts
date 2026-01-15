@@ -1,6 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { apiRequest, shouldUseMock } from '@/lib/api'
-import { mockHitStats, mockDailyStats } from '@/data/mock-data'
+import { apiRequest } from '@/lib/api'
 import type { KnowledgeHitStats, DailyHitStats } from '@/types/knowledge'
 
 interface MetricsSummaryResponse {
@@ -53,41 +52,6 @@ export function useMetrics() {
   const [error, setError] = useState<string | null>(null)
 
   const fetchMetrics = useCallback(async () => {
-    if (shouldUseMock()) {
-      setHitStats(mockHitStats)
-      setDailyStats(mockDailyStats)
-      
-      const totalHits = mockDailyStats.reduce((sum, day) => sum + day.total_hits, 0)
-      const totalSessions = mockDailyStats.reduce((sum, day) => sum + day.unique_sessions, 0)
-      
-      setSummary({
-        totalItems: 10,
-        publishedItems: 8,
-        draftItems: 2,
-        totalHits,
-        totalSessions,
-        avgDailyHits: Math.round(totalHits / mockDailyStats.length),
-        avgDailySessions: Math.round(totalSessions / mockDailyStats.length),
-        neverAccessedCount: 2,
-      })
-      
-      const tagCounts: Record<string, number> = {}
-      for (const stat of mockHitStats) {
-        for (const tag of stat.tags) {
-          tagCounts[tag] = (tagCounts[tag] || 0) + 1
-        }
-      }
-      setTagCloud(
-        Object.entries(tagCounts)
-          .map(([tag, count]) => ({ tag, count }))
-          .sort((a, b) => b.count - a.count)
-          .slice(0, 20)
-      )
-      
-      setIsLoading(false)
-      return
-    }
-
     setIsLoading(true)
     setError(null)
     

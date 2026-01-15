@@ -147,6 +147,7 @@ class NodeService:
             status=data.status,
             source=data.source,
             source_reference=data.source_reference,
+            metadata_=data.metadata_,
             created_by=created_by,
         )
         
