@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { NavLink } from 'react-router-dom'
 import {
   MessageCircleQuestion,
@@ -26,6 +26,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { useStaging } from '@/hooks/useStaging'
 
 interface NavItem {
   name: string
@@ -34,7 +35,7 @@ interface NavItem {
   badge?: number
 }
 
-const navigation: NavItem[] = [
+const baseNavigation: Omit<NavItem, 'badge'>[] = [
   { name: 'Graph Explorer', href: '/graph', icon: Network },
   { name: 'FAQs', href: '/', icon: MessageCircleQuestion },
   { name: 'Feature & Permissions', href: '/permissions', icon: ShieldCheck },
@@ -42,8 +43,8 @@ const navigation: NavItem[] = [
   { name: 'Playbooks', href: '/playbooks', icon: BookMarked },
   { name: 'Entities', href: '/entities', icon: Package },
   { name: 'Concepts', href: '/concepts', icon: Lightbulb },
-  { name: 'Content Onboarding', href: '/onboarding', icon: Upload },
-  { name: 'Staging Queue', href: '/staging', icon: Inbox, badge: 5 },
+  { name: 'Context Onboarding', href: '/onboarding', icon: Upload },
+  { name: 'Staging Queue', href: '/staging', icon: Inbox },
   { name: 'Usage Analytics', href: '/analytics', icon: BarChart3 },
   { name: 'Graph Health', href: '/graph-analytics', icon: Activity },
 ]
@@ -120,6 +121,16 @@ function NavLinkItem({ item, collapsed, isSecondary = false }: NavLinkItemProps)
 
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false)
+  const { pendingItems } = useStaging()
+  
+  const navigation = useMemo<NavItem[]>(() => {
+    return baseNavigation.map(item => {
+      if (item.href === '/staging') {
+        return { ...item, badge: pendingItems.length }
+      }
+      return item
+    })
+  }, [pendingItems.length])
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -133,11 +144,11 @@ export function Sidebar() {
         {/* Header */}
         <div className="flex h-16 items-center justify-between border-b border-border/50 px-4">
           {!collapsed && (
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 shrink-0">
                 <BookOpen className="h-5 w-5 text-primary" aria-hidden="true" />
               </div>
-              <span className="font-semibold tracking-tight">KB Admin</span>
+              <span className="font-semibold tracking-tight text-sm whitespace-nowrap">Context Management</span>
             </div>
           )}
           <Tooltip>

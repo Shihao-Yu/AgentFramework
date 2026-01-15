@@ -1,10 +1,10 @@
-# Content Onboarding
+# Context Onboarding
 
 Extract structured knowledge from raw text using LLM-powered pipelines.
 
 ## Overview
 
-The Content Onboarding system allows users to paste unstructured text (documentation, chat logs, emails, etc.) and automatically extract structured knowledge nodes for the knowledge base. All extracted content goes to a staging queue for human review before being published.
+The Context Onboarding system allows users to paste unstructured text (documentation, chat logs, emails, etc.) and automatically extract structured knowledge nodes for the knowledge base. All extracted content goes to a staging queue for human review before being published.
 
 ## Supported Node Types
 
@@ -217,7 +217,7 @@ The `LangfuseClient.get_prompt_template()` method tries Langfuse first, then fal
 
 ### OnboardingPage.tsx
 
-Main UI for content onboarding:
+Main UI for Context Onboarding:
 - Multiple content boxes with text input
 - Node type selection (toggle badges)
 - Source tag field for batch tracking

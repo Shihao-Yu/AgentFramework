@@ -2,7 +2,7 @@
 
 ## Overview
 
-The KB Admin UI is a React-based admin panel for managing a multi-type knowledge base system. It provides CRUD interfaces for 5 knowledge types, a staging queue for AI-generated content review, metrics dashboards, and system configuration.
+The Context Management UI is a React-based admin panel for managing a multi-type knowledge base system. It provides CRUD interfaces for 5 knowledge types, a staging queue for AI-generated content review, metrics dashboards, and system configuration.
 
 **Tech Stack:**
 - React 19 + TypeScript + Vite
