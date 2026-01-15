@@ -10,7 +10,6 @@ interface ApiNodeListResponse {
     title: string
     summary?: string
     content: {
-      question: string
       answer: string
       variants?: string[]
     }
@@ -87,7 +86,6 @@ export function useFAQs(tenantId?: string) {
         knowledge_type: 'faq',
         title: node.title,
         content: {
-          question: node.content.question || node.title,
           answer: node.content.answer || '',
         },
         tags: node.tags,
@@ -173,7 +171,7 @@ export function useFAQs(tenantId?: string) {
         tenant_id: string
         node_type: string
         title: string
-        content: { question: string; answer: string }
+        content: { answer: string }
         tags: string[]
         visibility: string
         status: string
@@ -185,7 +183,6 @@ export function useFAQs(tenantId?: string) {
           node_type: 'faq',
           title: data.title,
           content: {
-            question: data.question,
             answer: data.answer,
           },
           tags: data.tags,
@@ -199,7 +196,6 @@ export function useFAQs(tenantId?: string) {
         knowledge_type: 'faq',
         title: response.title,
         content: {
-          question: response.content.question,
           answer: response.content.answer,
         },
         tags: response.tags,
@@ -229,7 +225,7 @@ export function useFAQs(tenantId?: string) {
       const response = await apiRequest<{
         id: number
         title: string
-        content: { question: string; answer: string }
+        content: { answer: string }
         tags: string[]
         visibility: string
         status: string
@@ -239,7 +235,6 @@ export function useFAQs(tenantId?: string) {
         body: JSON.stringify({
           title: data.title,
           content: {
-            question: data.question,
             answer: data.answer,
           },
           tags: data.tags,
@@ -254,7 +249,6 @@ export function useFAQs(tenantId?: string) {
               ...item,
               title: response.title,
               content: {
-                question: response.content.question,
                 answer: response.content.answer,
               },
               tags: response.tags,

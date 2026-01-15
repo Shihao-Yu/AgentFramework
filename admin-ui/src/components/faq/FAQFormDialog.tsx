@@ -47,7 +47,6 @@ export function FAQFormDialog({
     resolver: zodResolver(faqFormSchema),
     defaultValues: {
       title: '',
-      question: '',
       answer: '',
       tags: [],
       status: 'draft',
@@ -60,7 +59,6 @@ export function FAQFormDialog({
     if (item) {
       form.reset({
         title: item.title,
-        question: item.content.question,
         answer: item.content.answer,
         tags: item.tags,
         status: item.status,
@@ -69,7 +67,6 @@ export function FAQFormDialog({
     } else {
       form.reset({
         title: '',
-        question: '',
         answer: '',
         tags: [],
         status: 'draft',
@@ -124,37 +121,19 @@ export function FAQFormDialog({
 
         <div className="flex-1 overflow-y-auto py-4 pr-2">
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-            {/* Title */}
             <div className="space-y-2">
               <Label htmlFor="title">
-                Title <span className="text-destructive">*</span>
+                Question <span className="text-destructive">*</span>
               </Label>
-              <Input
+              <Textarea
                 id="title"
-                placeholder="Short descriptive title"
+                placeholder="e.g., How do I create a purchase order?"
                 {...form.register('title')}
+                className="min-h-[80px]"
               />
               {form.formState.errors.title && (
                 <p className="text-sm text-destructive">
                   {form.formState.errors.title.message}
-                </p>
-              )}
-            </div>
-
-            {/* Question */}
-            <div className="space-y-2">
-              <Label htmlFor="question">
-                Question <span className="text-destructive">*</span>
-              </Label>
-              <Textarea
-                id="question"
-                placeholder="e.g., How do I create a purchase order?"
-                {...form.register('question')}
-                className="min-h-[80px]"
-              />
-              {form.formState.errors.question && (
-                <p className="text-sm text-destructive">
-                  {form.formState.errors.question.message}
                 </p>
               )}
             </div>

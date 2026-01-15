@@ -76,7 +76,7 @@ interface AddNodeModalProps {
 function getDefaultContent(nodeType: NodeType): NodeContent {
   switch (nodeType) {
     case NodeType.FAQ:
-      return { question: '', answer: '', variants: [] } as FAQContent
+      return { answer: '', variants: [] } as FAQContent
     case NodeType.PLAYBOOK:
       return { description: '', steps: [{ order: 1, action: '' }], prerequisites: [], estimated_time: '', related_forms: [] } as PlaybookContent
     case NodeType.PERMISSION_RULE:
@@ -405,15 +405,6 @@ function FAQContentForm({ content, onChange }: { content: FAQContent; onChange: 
 
   return (
     <div className="space-y-4">
-      <div className="space-y-2">
-        <Label>Question *</Label>
-        <Textarea
-          value={content.question}
-          onChange={(e) => onChange({ ...content, question: e.target.value })}
-          placeholder="What is the question?"
-          rows={2}
-        />
-      </div>
       <div className="space-y-2">
         <Label>Answer *</Label>
         <Textarea

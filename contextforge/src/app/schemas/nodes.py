@@ -14,7 +14,7 @@ from app.models.enums import NodeType, KnowledgeStatus, Visibility
 # =============================================================================
 
 class FAQContent(BaseModel):
-    question: str = Field(..., min_length=1)
+    """FAQ content - question and answer pair."""
     answer: str = Field(..., min_length=1)
     variants: List[str] = Field(default=[])
 

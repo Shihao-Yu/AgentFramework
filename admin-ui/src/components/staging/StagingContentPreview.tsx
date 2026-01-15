@@ -6,7 +6,6 @@ interface StagingContentPreviewProps {
 }
 
 interface FAQContent {
-  question: string
   answer: string
 }
 
@@ -26,7 +25,7 @@ interface PermissionContent {
 function FAQPreview({ content }: { content: FAQContent }) {
   return (
     <p className="text-sm text-muted-foreground line-clamp-2">
-      {content.question || 'No question provided'}
+      {content.answer || 'No answer provided'}
     </p>
   )
 }

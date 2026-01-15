@@ -95,7 +95,7 @@ export function FAQDataTable({
             <div className="max-w-md">
               <div className="font-medium">{item.title}</div>
               <div className="text-sm text-muted-foreground line-clamp-1">
-                {item.content.question}
+                {item.content.answer}
               </div>
             </div>
           )

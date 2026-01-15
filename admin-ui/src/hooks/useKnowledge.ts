@@ -20,7 +20,6 @@ interface LegacyFAQFormData {
   category_id?: number
   title: string
   summary?: string
-  question: string
   answer: string
   tags: string[]
   visibility: string
@@ -28,7 +27,6 @@ interface LegacyFAQFormData {
 }
 
 interface FAQContent {
-  question: string
   answer: string
 }
 
@@ -142,7 +140,6 @@ export function useKnowledgeItems(filters: LegacyKnowledgeFilters = {}) {
           title: data.title,
           summary: data.summary,
           content: {
-            question: data.question,
             answer: data.answer,
           },
           tags: data.tags,
@@ -158,7 +155,6 @@ export function useKnowledgeItems(filters: LegacyKnowledgeFilters = {}) {
         title: data.title,
         summary: data.summary,
         content: {
-          question: data.question,
           answer: data.answer,
         },
         tags: data.tags,
@@ -187,9 +183,8 @@ export function useKnowledgeItems(filters: LegacyKnowledgeFilters = {}) {
       if (data.tags) updatePayload.tags = data.tags
       if (data.visibility) updatePayload.visibility = data.visibility
       if (data.status) updatePayload.status = data.status
-      if (data.question || data.answer) {
+      if (data.answer) {
         updatePayload.content = {
-          question: data.question,
           answer: data.answer,
         }
       }
@@ -210,8 +205,8 @@ export function useKnowledgeItems(filters: LegacyKnowledgeFilters = {}) {
               tags: data.tags ?? item.tags,
               visibility: data.visibility ?? item.visibility,
               status: data.status ?? item.status,
-              content: data.question && data.answer
-                ? { question: data.question, answer: data.answer }
+              content: data.answer
+                ? { answer: data.answer }
                 : item.content,
               updated_at: new Date().toISOString(),
             }

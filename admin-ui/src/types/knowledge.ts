@@ -38,7 +38,6 @@ export type ExampleFormat = (typeof ExampleFormat)[keyof typeof ExampleFormat]
 // ==================== Content Types ====================
 
 export interface FAQContent {
-  question: string
   answer: string // Markdown supported
 }
 
@@ -145,8 +144,7 @@ export const DEFAULT_DOMAINS: Domain[] = [
 // ==================== Zod Schemas for Forms ====================
 
 export const faqFormSchema = z.object({
-  title: z.string().min(3, 'Title must be at least 3 characters'),
-  question: z.string().min(10, 'Question must be at least 10 characters'),
+  title: z.string().min(10, 'Question must be at least 10 characters'),
   answer: z.string().min(20, 'Answer must be at least 20 characters'),
   tags: z.array(z.string()),
   status: z.enum(['draft', 'published', 'archived']),

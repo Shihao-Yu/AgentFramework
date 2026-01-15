@@ -159,13 +159,16 @@ class NodeService:
         self.session.add(node)
         await self.session.flush()
         
+        # Convert to PostgreSQL vector format
+        embedding_str = "[" + ",".join(str(x) for x in embedding) + "]"
+        
         await self.session.execute(
             text(sql("""
                 UPDATE {schema}.knowledge_nodes 
                 SET embedding = :embedding::vector 
                 WHERE id = :id
             """)),
-            {"id": node.id, "embedding": embedding}
+            {"id": node.id, "embedding": embedding_str}
         )
         
         # Sync SHARED_TAG edges if node has tags and is published
@@ -221,13 +224,16 @@ class NodeService:
             embed_text = self._build_embed_text(node.title, node.content, node.node_type)
             embedding = await client.embed(embed_text)
             
+            # Convert to PostgreSQL vector format
+            embedding_str = "[" + ",".join(str(x) for x in embedding) + "]"
+            
             await self.session.execute(
                 text(sql("""
                     UPDATE {schema}.knowledge_nodes 
                     SET embedding = :embedding::vector 
                     WHERE id = :id
                 """)),
-                {"id": node.id, "embedding": embedding}
+                {"id": node.id, "embedding": embedding_str}
             )
         
         # Sync SHARED_TAG edges if tags or status changed
@@ -437,6 +443,8 @@ class NodeService:
                     
                     # Generate embedding
                     embedding = await client.embed(embed_text)
+                    # Convert to PostgreSQL vector format
+                    embedding_str = "[" + ",".join(str(x) for x in embedding) + "]"
                     
                     # Update node
                     await self.session.execute(
@@ -446,7 +454,7 @@ class NodeService:
                                 updated_at = NOW()
                             WHERE id = :id
                         """)),
-                        {"id": node.id, "embedding": embedding}
+                        {"id": node.id, "embedding": embedding_str}
                     )
                     
                     stats["updated"] += 1
@@ -499,8 +507,6 @@ class NodeService:
         parts = [title]
         
         if node_type == NodeType.FAQ:
-            if "question" in content:
-                parts.append(content["question"])
             if "answer" in content:
                 parts.append(content["answer"])
         

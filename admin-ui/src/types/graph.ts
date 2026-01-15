@@ -78,7 +78,6 @@ export const Visibility = {
 export type Visibility = (typeof Visibility)[keyof typeof Visibility]
 
 export interface FAQContent {
-  question: string
   answer: string
   variants?: string[]
 }
@@ -417,7 +416,6 @@ export interface ContextResponse {
 }
 
 export const faqContentSchema = z.object({
-  question: z.string().min(10, 'Question must be at least 10 characters'),
   answer: z.string().min(20, 'Answer must be at least 20 characters'),
   variants: z.array(z.string()).optional(),
 })

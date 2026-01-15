@@ -9,7 +9,6 @@ class FAQPipeline(OnboardingPipeline[FAQExtraction]):
 
     def to_node_content(self, extraction: FAQExtraction) -> dict:
         return {
-            "question": extraction.question,
             "answer": extraction.answer,
         }
 

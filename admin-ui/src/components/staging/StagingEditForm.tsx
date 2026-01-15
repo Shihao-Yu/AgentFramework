@@ -22,30 +22,19 @@ function FAQEditForm({
   content, 
   onChange 
 }: { 
-  content: { question?: string; answer?: string }
+  content: { answer?: string }
   onChange: (content: Record<string, unknown>) => void 
 }) {
   return (
-    <>
-      <div className="space-y-2">
-        <Label>Question</Label>
-        <Textarea
-          value={content.question || ''}
-          onChange={(e) => onChange({ ...content, question: e.target.value })}
-          className="min-h-[100px]"
-          placeholder="Enter the question..."
-        />
-      </div>
-      <div className="space-y-2">
-        <Label>Answer</Label>
-        <Textarea
-          value={content.answer || ''}
-          onChange={(e) => onChange({ ...content, answer: e.target.value })}
-          className="min-h-[200px]"
-          placeholder="Enter the answer (Markdown supported)..."
-        />
-      </div>
-    </>
+    <div className="space-y-2">
+      <Label>Answer</Label>
+      <Textarea
+        value={content.answer || ''}
+        onChange={(e) => onChange({ ...content, answer: e.target.value })}
+        className="min-h-[200px]"
+        placeholder="Enter the answer (Markdown supported)..."
+      />
+    </div>
   )
 }
 
@@ -243,7 +232,7 @@ export function StagingEditForm({ item, editedData, onChange }: StagingEditFormP
   const renderContentForm = () => {
     switch (item.node_type) {
       case 'faq':
-        return <FAQEditForm content={editedData.content as { question?: string; answer?: string }} onChange={handleContentChange} />
+        return <FAQEditForm content={editedData.content as { answer?: string }} onChange={handleContentChange} />
       case 'playbook':
         return <PlaybookEditForm content={editedData.content as { domain?: string; content?: string }} onChange={handleContentChange} />
       case 'permission_rule':
@@ -256,11 +245,11 @@ export function StagingEditForm({ item, editedData, onChange }: StagingEditFormP
   return (
     <div className="space-y-4">
       <div className="space-y-2">
-        <Label>Title</Label>
+        <Label>{item.node_type === 'faq' ? 'Question' : 'Title'}</Label>
         <Input
           value={editedData.title}
           onChange={(e) => onChange({ ...editedData, title: e.target.value })}
-          placeholder="Enter title..."
+          placeholder={item.node_type === 'faq' ? 'Enter the question...' : 'Enter title...'}
         />
       </div>
 

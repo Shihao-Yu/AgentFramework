@@ -35,10 +35,6 @@ function FAQContentView({ content }: { content: FAQContent }) {
   return (
     <div className="space-y-4">
       <div>
-        <h4 className="text-sm font-medium text-muted-foreground">Question</h4>
-        <p className="mt-1">{content.question}</p>
-      </div>
-      <div>
         <h4 className="text-sm font-medium text-muted-foreground">Answer</h4>
         <div className="mt-1 prose prose-sm dark:prose-invert max-w-none">
           {content.answer}
