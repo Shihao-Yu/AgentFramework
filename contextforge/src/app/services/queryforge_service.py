@@ -419,7 +419,12 @@ class QueryForgeService:
             }
         
         try:
-            context = await self._build_query_context(tenant_id, dataset_name)
+            # Use hybrid search with question for relevance-based context retrieval
+            context = await self._build_query_context(
+                tenant_id=tenant_id,
+                dataset_name=dataset_name,
+                question=question,
+            )
             
             if not context:
                 return {
@@ -478,9 +483,32 @@ class QueryForgeService:
         self,
         tenant_id: str,
         dataset_name: str,
+        question: Optional[str] = None,
+        max_fields: int = 30,
+        max_examples: int = 5,
+        bm25_weight: float = 0.4,
+        vector_weight: float = 0.6,
     ) -> Optional[Dict[str, Any]]:
-        """Build query context from our KnowledgeNodes."""
-        # Find schema_index node
+        """
+        Build query context from KnowledgeNodes using hybrid search.
+        
+        When a question is provided, uses hybrid search (BM25 + vector) to retrieve
+        the most relevant schema fields and examples. Falls back to flat fetch
+        when no question is provided.
+        
+        Args:
+            tenant_id: Tenant identifier
+            dataset_name: Dataset/document name
+            question: User question for relevance-based retrieval
+            max_fields: Maximum schema fields to retrieve (default: 30)
+            max_examples: Maximum examples to retrieve (default: 5)
+            bm25_weight: Weight for BM25 text search (default: 0.4)
+            vector_weight: Weight for vector similarity (default: 0.6)
+        
+        Returns:
+            Context dict with fields, examples, and relevance scores
+        """
+        # Find schema_index node (required)
         query = select(KnowledgeNode).where(
             KnowledgeNode.tenant_id == tenant_id,
             KnowledgeNode.node_type == NodeType.SCHEMA_INDEX,
@@ -493,48 +521,261 @@ class QueryForgeService:
         if not index_node:
             return None
         
-        # Find schema_field nodes
-        field_query = select(KnowledgeNode).where(
-            KnowledgeNode.tenant_id == tenant_id,
-            KnowledgeNode.node_type == NodeType.SCHEMA_FIELD,
-            KnowledgeNode.dataset_name == dataset_name,
-            KnowledgeNode.is_deleted == False,
-        ).limit(500)
-        field_result = await self.session.execute(field_query)
-        field_nodes = field_result.scalars().all()
+        # Use hybrid search when question provided, else flat fetch
+        if question and question.strip():
+            fields_with_scores = await self._hybrid_search_fields(
+                tenant_id=tenant_id,
+                dataset_name=dataset_name,
+                question=question,
+                max_results=max_fields,
+                bm25_weight=bm25_weight,
+                vector_weight=vector_weight,
+            )
+            examples_with_scores = await self._hybrid_search_examples(
+                tenant_id=tenant_id,
+                dataset_name=dataset_name,
+                question=question,
+                max_results=max_examples,
+                bm25_weight=bm25_weight,
+                vector_weight=vector_weight,
+            )
+        else:
+            # Fallback: flat fetch without scoring
+            fields_with_scores = await self._flat_fetch_fields(
+                tenant_id=tenant_id,
+                dataset_name=dataset_name,
+                max_results=max_fields,
+            )
+            examples_with_scores = await self._flat_fetch_examples(
+                tenant_id=tenant_id,
+                dataset_name=dataset_name,
+                max_results=max_examples,
+            )
         
-        # Find example nodes
-        example_query = select(KnowledgeNode).where(
-            KnowledgeNode.tenant_id == tenant_id,
-            KnowledgeNode.node_type == NodeType.EXAMPLE,
-            KnowledgeNode.dataset_name == dataset_name,
-            KnowledgeNode.is_deleted == False,
-        ).limit(10)
-        example_result = await self.session.execute(example_query)
-        example_nodes = example_result.scalars().all()
+        # Calculate average field score for confidence estimation
+        field_scores = [f.get("score", 0.0) for f in fields_with_scores]
+        avg_field_score = sum(field_scores) / len(field_scores) if field_scores else 0.0
         
         return {
             "source_type": index_node.content.get("source_type", "postgres"),
             "dataset_name": dataset_name,
             "description": index_node.content.get("description", ""),
-            "fields": [
-                {
-                    "path": f.field_path,
-                    "type": f.data_type,
-                    "description": f.content.get("description", ""),
-                    "allowed_values": f.content.get("allowed_values", []),
-                }
-                for f in field_nodes
-            ],
-            "examples": [
-                {
-                    "question": e.content.get("question", ""),
-                    "query": e.content.get("query", ""),
-                }
-                for e in example_nodes
-                if e.content.get("verified", False)
-            ],
+            "fields": fields_with_scores,
+            "examples": examples_with_scores,
+            "retrieval_stats": {
+                "field_count": len(fields_with_scores),
+                "example_count": len(examples_with_scores),
+                "avg_field_score": round(avg_field_score, 3),
+                "used_hybrid_search": bool(question and question.strip()),
+            },
         }
+    
+    async def _hybrid_search_fields(
+        self,
+        tenant_id: str,
+        dataset_name: str,
+        question: str,
+        max_results: int = 30,
+        bm25_weight: float = 0.4,
+        vector_weight: float = 0.6,
+    ) -> List[Dict[str, Any]]:
+        """
+        Retrieve schema fields using hybrid search (BM25 + vector).
+        
+        Returns fields ranked by relevance to the question, with scores.
+        """
+        # Generate query embedding
+        query_embedding = await self.embedding_client.embed(question)
+        embedding_str = "[" + ",".join(str(x) for x in query_embedding) + "]"
+        
+        result = await self.session.execute(
+            text(schema_sql("""
+                SELECT * FROM {schema}.hybrid_search_nodes(
+                    :query_text,
+                    :query_embedding,
+                    :tenant_ids,
+                    :node_types,
+                    :tag_filter,
+                    :bm25_weight,
+                    :vector_weight,
+                    :result_limit
+                )
+            """)),
+            {
+                "query_text": question,
+                "query_embedding": embedding_str,
+                "tenant_ids": [tenant_id],
+                "node_types": [NodeType.SCHEMA_FIELD.value],
+                "tag_filter": None,
+                "bm25_weight": bm25_weight,
+                "vector_weight": vector_weight,
+                "result_limit": max_results * 2,  # Fetch extra to filter by dataset
+            }
+        )
+        
+        rows = result.fetchall()
+        fields = []
+        
+        for row in rows:
+            if len(fields) >= max_results:
+                break
+            
+            # Filter by dataset_name
+            if row.dataset_name != dataset_name:
+                continue
+            
+            fields.append({
+                "path": row.field_path,
+                "type": getattr(row, 'data_type', 'string'),
+                "description": row.content.get("description", "") if row.content else "",
+                "business_meaning": row.content.get("business_meaning", "") if row.content else "",
+                "allowed_values": row.content.get("allowed_values", []) if row.content else [],
+                "value_synonyms": row.content.get("value_synonyms", {}) if row.content else {},
+                "score": round(row.rrf_score, 3) if hasattr(row, 'rrf_score') else 0.0,
+                "bm25_score": round(row.bm25_score, 3) if hasattr(row, 'bm25_score') else 0.0,
+                "vector_score": round(row.vector_score, 3) if hasattr(row, 'vector_score') else 0.0,
+            })
+        
+        logger.debug(
+            f"Hybrid search retrieved {len(fields)} schema fields for "
+            f"{tenant_id}/{dataset_name}: {question[:50]}..."
+        )
+        return fields
+    
+    async def _hybrid_search_examples(
+        self,
+        tenant_id: str,
+        dataset_name: str,
+        question: str,
+        max_results: int = 5,
+        bm25_weight: float = 0.4,
+        vector_weight: float = 0.6,
+    ) -> List[Dict[str, Any]]:
+        """
+        Retrieve Q&A examples using hybrid search (BM25 + vector).
+        
+        Returns verified examples ranked by relevance to the question, with scores.
+        """
+        # Generate query embedding
+        query_embedding = await self.embedding_client.embed(question)
+        embedding_str = "[" + ",".join(str(x) for x in query_embedding) + "]"
+        
+        result = await self.session.execute(
+            text(schema_sql("""
+                SELECT * FROM {schema}.hybrid_search_nodes(
+                    :query_text,
+                    :query_embedding,
+                    :tenant_ids,
+                    :node_types,
+                    :tag_filter,
+                    :bm25_weight,
+                    :vector_weight,
+                    :result_limit
+                )
+            """)),
+            {
+                "query_text": question,
+                "query_embedding": embedding_str,
+                "tenant_ids": [tenant_id],
+                "node_types": [NodeType.EXAMPLE.value],
+                "tag_filter": None,
+                "bm25_weight": bm25_weight,
+                "vector_weight": vector_weight,
+                "result_limit": max_results * 3,  # Fetch extra to filter
+            }
+        )
+        
+        rows = result.fetchall()
+        examples = []
+        
+        for row in rows:
+            if len(examples) >= max_results:
+                break
+            
+            # Filter by dataset_name
+            if row.dataset_name != dataset_name:
+                continue
+            
+            # Only include verified examples
+            content = row.content or {}
+            if not content.get("verified", False):
+                continue
+            
+            examples.append({
+                "question": content.get("question", row.title or ""),
+                "query": content.get("query", ""),
+                "query_type": content.get("query_type", "sql"),
+                "explanation": content.get("explanation"),
+                "score": round(row.rrf_score, 3) if hasattr(row, 'rrf_score') else 0.0,
+            })
+        
+        logger.debug(
+            f"Hybrid search retrieved {len(examples)} examples for "
+            f"{tenant_id}/{dataset_name}: {question[:50]}..."
+        )
+        return examples
+    
+    async def _flat_fetch_fields(
+        self,
+        tenant_id: str,
+        dataset_name: str,
+        max_results: int = 30,
+    ) -> List[Dict[str, Any]]:
+        """Fallback: fetch schema fields without relevance scoring."""
+        field_query = select(KnowledgeNode).where(
+            KnowledgeNode.tenant_id == tenant_id,
+            KnowledgeNode.node_type == NodeType.SCHEMA_FIELD,
+            KnowledgeNode.dataset_name == dataset_name,
+            KnowledgeNode.is_deleted == False,
+        ).limit(max_results)
+        field_result = await self.session.execute(field_query)
+        field_nodes = field_result.scalars().all()
+        
+        return [
+            {
+                "path": f.field_path,
+                "type": f.data_type,
+                "description": f.content.get("description", "") if f.content else "",
+                "business_meaning": f.content.get("business_meaning", "") if f.content else "",
+                "allowed_values": f.content.get("allowed_values", []) if f.content else [],
+                "value_synonyms": f.content.get("value_synonyms", {}) if f.content else {},
+                "score": 0.5,  # Default score for flat fetch
+            }
+            for f in field_nodes
+        ]
+    
+    async def _flat_fetch_examples(
+        self,
+        tenant_id: str,
+        dataset_name: str,
+        max_results: int = 5,
+    ) -> List[Dict[str, Any]]:
+        """Fallback: fetch examples without relevance scoring."""
+        example_query = select(KnowledgeNode).where(
+            KnowledgeNode.tenant_id == tenant_id,
+            KnowledgeNode.node_type == NodeType.EXAMPLE,
+            KnowledgeNode.dataset_name == dataset_name,
+            KnowledgeNode.is_deleted == False,
+        ).limit(max_results * 2)  # Fetch extra to filter verified
+        example_result = await self.session.execute(example_query)
+        example_nodes = example_result.scalars().all()
+        
+        examples = []
+        for e in example_nodes:
+            if len(examples) >= max_results:
+                break
+            content = e.content or {}
+            if not content.get("verified", False):
+                continue
+            examples.append({
+                "question": content.get("question", e.title or ""),
+                "query": content.get("query", ""),
+                "query_type": content.get("query_type", "sql"),
+                "explanation": content.get("explanation"),
+                "score": 0.5,  # Default score for flat fetch
+            })
+        
+        return examples
     
     async def _execute_query(
         self,
@@ -604,6 +845,14 @@ class QueryForgeService:
         validate_query: bool = True,
         prompt_name: str = "query_generation",
     ) -> Dict[str, Any]:
+        """
+        Generate query using LLM with relevance-ranked context.
+        
+        Confidence is calculated from:
+        - LLM's reported confidence (if available)
+        - Average field relevance score from hybrid search
+        - Number of high-relevance fields and examples
+        """
         source_type = context.get("source_type", "postgres")
         
         prompt_config = None
@@ -623,6 +872,15 @@ class QueryForgeService:
         
         raw_query = result.query
         
+        # Calculate confidence from context quality + LLM confidence
+        context_confidence = self._calculate_context_confidence(context)
+        llm_confidence = result.confidence if result.confidence is not None else 0.7
+        # Weighted combination: 60% context quality, 40% LLM confidence
+        combined_confidence = round(0.6 * context_confidence + 0.4 * llm_confidence, 2)
+        
+        # Build retrieval stats for response
+        retrieval_stats = context.get("retrieval_stats", {})
+        
         if validate_query and source_type in ("postgres", "mysql", "clickhouse"):
             validator = QueryValidator(max_limit=1000, require_limit=True)
             validation_result = validator.validate(raw_query)
@@ -633,6 +891,7 @@ class QueryForgeService:
                     "error": f"Generated query failed validation: {validation_result.error}",
                     "raw_query": raw_query,
                     "query_type": source_type,
+                    "retrieval_stats": retrieval_stats,
                 }
             
             return {
@@ -640,11 +899,12 @@ class QueryForgeService:
                 "query": validation_result.sanitized_query,
                 "query_type": source_type,
                 "explanation": result.explanation if include_explanation else None,
-                "confidence": result.confidence,
+                "confidence": combined_confidence,
                 "validation": {
                     "is_valid": True,
                     "warnings": validation_result.warnings,
                 },
+                "retrieval_stats": retrieval_stats,
             }
         
         return {
@@ -652,8 +912,50 @@ class QueryForgeService:
             "query": raw_query,
             "query_type": source_type,
             "explanation": result.explanation if include_explanation else None,
-            "confidence": result.confidence,
+            "confidence": combined_confidence,
+            "retrieval_stats": retrieval_stats,
         }
+    
+    def _calculate_context_confidence(self, context: Dict[str, Any]) -> float:
+        """
+        Calculate confidence score based on context quality.
+        
+        Factors:
+        - Average field relevance score (weight: 0.5)
+        - High-relevance field count (weight: 0.3)
+        - Example availability (weight: 0.2)
+        
+        Returns:
+            Confidence score between 0.1 and 1.0
+        """
+        fields = context.get("fields", [])
+        examples = context.get("examples", [])
+        
+        # Factor 1: Average field score
+        field_scores = [f.get("score", 0.0) for f in fields]
+        avg_field_score = sum(field_scores) / len(field_scores) if field_scores else 0.0
+        
+        # Factor 2: High-relevance field ratio (score > 0.6)
+        high_relevance_count = sum(1 for s in field_scores if s > 0.6)
+        high_relevance_ratio = high_relevance_count / max(len(fields), 1)
+        
+        # Factor 3: Example quality
+        example_scores = [e.get("score", 0.0) for e in examples]
+        example_factor = min(1.0, len(examples) / 3.0)  # Saturates at 3 examples
+        if example_scores:
+            # Boost if examples are high quality
+            avg_example_score = sum(example_scores) / len(example_scores)
+            example_factor = (example_factor + avg_example_score) / 2
+        
+        # Weighted combination
+        confidence = (
+            0.50 * avg_field_score +
+            0.30 * high_relevance_ratio +
+            0.20 * example_factor
+        )
+        
+        # Clamp to [0.1, 1.0]
+        return max(0.1, min(1.0, confidence))
     
     def _get_query_format(self, source_type: str) -> str:
         if source_type in ("postgres", "mysql", "clickhouse"):
@@ -665,31 +967,95 @@ class QueryForgeService:
         return "query"
     
     def _build_system_prompt(self, source_type: str, context: Dict[str, Any]) -> str:
+        """
+        Build system prompt with relevance-ranked schema fields and examples.
+        
+        Fields and examples are sorted by relevance score (highest first).
+        High-relevance fields get more detailed descriptions.
+        """
         query_format = self._get_query_format(source_type)
         
-        fields_text = "\n".join([
-            f"- {f['path']} ({f['type']}): {f['description']}"
-            + (f" [values: {', '.join(f['allowed_values'][:5])}]" if f.get('allowed_values') else "")
-            for f in context.get("fields", [])[:50]
-        ])
+        # Sort fields by score (highest first)
+        fields = context.get("fields", [])
+        sorted_fields = sorted(fields, key=lambda f: f.get("score", 0), reverse=True)
+        
+        # Format fields with relevance-aware detail level
+        field_lines = []
+        for i, f in enumerate(sorted_fields[:40]):  # Limit to top 40 fields
+            score = f.get("score", 0)
+            path = f.get("path", "")
+            field_type = f.get("type", "string")
+            desc = f.get("description", "")
+            
+            # High-relevance fields (score > 0.6) get more detail
+            if score > 0.6:
+                line = f"- {path} ({field_type}): {desc}"
+                
+                # Add business meaning if available
+                if f.get("business_meaning"):
+                    line += f"\n  Business meaning: {f['business_meaning']}"
+                
+                # Add allowed values
+                if f.get("allowed_values"):
+                    values = f["allowed_values"][:5]
+                    values_str = ", ".join(str(v) for v in values)
+                    if len(f["allowed_values"]) > 5:
+                        values_str += f" (+ {len(f['allowed_values']) - 5} more)"
+                    line += f"\n  Allowed values: {values_str}"
+                
+                # Add value synonyms/encodings
+                if f.get("value_synonyms"):
+                    synonyms = f["value_synonyms"]
+                    syn_strs = [f"{k}={v[0] if isinstance(v, list) and v else v}" 
+                                for k, v in list(synonyms.items())[:5]]
+                    if syn_strs:
+                        line += f"\n  Value meanings: {', '.join(syn_strs)}"
+            else:
+                # Lower relevance fields get minimal formatting
+                line = f"- {path} ({field_type})"
+                if desc:
+                    line += f": {desc[:60]}{'...' if len(desc) > 60 else ''}"
+                if f.get("allowed_values"):
+                    line += f" [values: {', '.join(str(v) for v in f['allowed_values'][:3])}]"
+            
+            field_lines.append(line)
+        
+        fields_text = "\n".join(field_lines) if field_lines else "No schema fields available."
+        
+        # Sort examples by score and format
+        examples = context.get("examples", [])
+        sorted_examples = sorted(examples, key=lambda e: e.get("score", 0), reverse=True)
         
         examples_text = ""
-        examples = context.get("examples", [])
-        if examples:
-            examples_text = "\n\nExamples:\n" + "\n".join([
-                f"Q: {e['question']}\nA: {e['query']}"
-                for e in examples[:5]
-            ])
+        if sorted_examples:
+            example_lines = []
+            for e in sorted_examples[:5]:  # Top 5 examples
+                q = e.get("question", "")
+                query = e.get("query", "")
+                explanation = e.get("explanation", "")
+                
+                example_lines.append(f"Q: {q}")
+                example_lines.append(f"A: {query}")
+                if explanation:
+                    example_lines.append(f"   ({explanation})")
+            
+            examples_text = "\n\nSimilar Examples:\n" + "\n".join(example_lines)
+        
+        # Add retrieval stats hint for transparency
+        stats = context.get("retrieval_stats", {})
+        stats_hint = ""
+        if stats.get("used_hybrid_search"):
+            stats_hint = f"\n\n(Context: {stats.get('field_count', 0)} relevant fields, {stats.get('example_count', 0)} examples)"
         
         return f"""You are a {query_format} query generator.
 
 Dataset: {context.get('dataset_name', 'unknown')}
 Description: {context.get('description', '')}
 
-Schema:
-{fields_text}{examples_text}
+Relevant Schema Fields:
+{fields_text}{examples_text}{stats_hint}
 
-Generate valid {query_format} queries based on user questions."""
+Generate valid {query_format} queries based on user questions. Use only the fields shown above."""
     
     def _build_user_prompt(self, question: str, include_explanation: bool) -> str:
         if include_explanation:
