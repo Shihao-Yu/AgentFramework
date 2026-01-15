@@ -357,6 +357,115 @@ class NodeService:
         result = await self.session.execute(query)
         return list(result.scalars().all())
     
+    async def reembed_nodes(
+        self,
+        user_tenant_ids: List[str],
+        node_types: Optional[List[NodeType]] = None,
+        batch_size: int = 50,
+        only_missing: bool = False,
+    ) -> Dict[str, Any]:
+        """
+        Regenerate embeddings for nodes.
+        
+        Useful for:
+        - Initializing embeddings for seed data
+        - Updating embeddings after model change
+        - Fixing nodes with missing embeddings
+        
+        Args:
+            user_tenant_ids: Tenant IDs to process
+            node_types: Optional filter for specific node types
+            batch_size: Number of nodes to process per batch
+            only_missing: If True, only embed nodes without embeddings
+        
+        Returns:
+            Stats dict with processed, updated, errors counts
+        """
+        client = self._require_embedding_client()
+        
+        stats = {
+            "processed": 0,
+            "updated": 0,
+            "skipped": 0,
+            "errors": 0,
+            "batches": 0,
+        }
+        
+        # Build query for nodes to process
+        query = select(KnowledgeNode).where(
+            KnowledgeNode.is_deleted == False,
+            KnowledgeNode.tenant_id.in_(user_tenant_ids),
+        )
+        
+        if node_types:
+            query = query.where(KnowledgeNode.node_type.in_(node_types))
+        
+        if only_missing:
+            # Only nodes without embeddings
+            query = query.where(
+                text("embedding IS NULL")
+            )
+        
+        query = query.order_by(KnowledgeNode.id)
+        
+        # Process in batches
+        offset = 0
+        while True:
+            batch_query = query.offset(offset).limit(batch_size)
+            result = await self.session.execute(batch_query)
+            nodes = result.scalars().all()
+            
+            if not nodes:
+                break
+            
+            stats["batches"] += 1
+            
+            for node in nodes:
+                stats["processed"] += 1
+                
+                try:
+                    # Build embedding text
+                    embed_text = self._build_embed_text(
+                        node.title,
+                        node.content or {},
+                        node.node_type,
+                    )
+                    
+                    if not embed_text.strip():
+                        stats["skipped"] += 1
+                        continue
+                    
+                    # Generate embedding
+                    embedding = await client.embed(embed_text)
+                    
+                    # Update node
+                    await self.session.execute(
+                        text(sql("""
+                            UPDATE {schema}.knowledge_nodes 
+                            SET embedding = :embedding::vector,
+                                updated_at = NOW()
+                            WHERE id = :id
+                        """)),
+                        {"id": node.id, "embedding": embedding}
+                    )
+                    
+                    stats["updated"] += 1
+                    
+                except Exception as e:
+                    logger.warning(f"Failed to embed node {node.id}: {e}")
+                    stats["errors"] += 1
+            
+            # Commit each batch
+            await self.session.commit()
+            
+            offset += batch_size
+            logger.info(
+                f"Reembed progress: {stats['processed']} processed, "
+                f"{stats['updated']} updated, {stats['errors']} errors"
+            )
+        
+        return stats
+    
     async def get_node_versions(
         self,
         node_id: int,

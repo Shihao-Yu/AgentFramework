@@ -13,7 +13,9 @@ from app.core.database import get_session
 from app.core.dependencies import get_embedding_client, get_current_user
 from app.clients.embedding_client import EmbeddingClient
 from app.services.graph_sync_service import GraphSyncService
+from app.services.node_service import NodeService
 from app.services.tenant_service import TenantService
+from app.models.enums import NodeType
 
 
 router = APIRouter(prefix="/sync", tags=["sync"])
@@ -156,3 +158,48 @@ async def cleanup_old_events(
         "events_deleted": deleted,
         "days_kept": days_to_keep,
     }
+
+
+class ReembedResponse(BaseModel):
+    processed: int
+    updated: int
+    skipped: int
+    errors: int
+    batches: int
+
+
+@router.post("/reembed", response_model=ReembedResponse)
+async def reembed_nodes(
+    node_types: Optional[List[NodeType]] = Query(None, description="Filter by node types"),
+    batch_size: int = Query(50, ge=1, le=200, description="Nodes per batch"),
+    only_missing: bool = Query(False, description="Only embed nodes without embeddings"),
+    session: AsyncSession = Depends(get_session),
+    embedding_client: EmbeddingClient = Depends(get_embedding_client),
+    current_user: str = Depends(get_current_user),
+):
+    """
+    Regenerate embeddings for all nodes.
+    
+    Use cases:
+    - Initialize embeddings for seed data loaded via SQL
+    - Update embeddings after changing embedding model
+    - Fix nodes with missing embeddings
+    
+    Parameters:
+    - node_types: Optional filter to only reembed specific node types
+    - batch_size: Number of nodes to process per batch (affects memory)
+    - only_missing: If true, only embed nodes that have NULL embeddings
+    
+    Note: This can be slow for large datasets. Consider running during off-hours.
+    """
+    user_tenant_ids = await get_user_tenant_ids(session, current_user)
+    
+    service = NodeService(session, embedding_client)
+    stats = await service.reembed_nodes(
+        user_tenant_ids=user_tenant_ids,
+        node_types=node_types,
+        batch_size=batch_size,
+        only_missing=only_missing,
+    )
+    
+    return ReembedResponse(**stats)
