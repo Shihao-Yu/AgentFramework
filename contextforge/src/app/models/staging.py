@@ -4,12 +4,14 @@ from sqlmodel import SQLModel, Field, Column
 from sqlalchemy import String, Text, BigInteger, Float, ARRAY
 from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMP
 
-from app.models.enums import NodeType, StagingStatus, StagingAction
+from app.utils.schema import get_schema
+
+_SCHEMA = get_schema()
 
 
 class StagingNode(SQLModel, table=True):
     __tablename__ = "staging_nodes"
-    __table_args__ = {"schema": "faq"}
+    __table_args__ = {"schema": _SCHEMA}
 
     id: Optional[int] = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
     tenant_id: str = Field(sa_column=Column(String(100), nullable=False))
