@@ -1,3 +1,9 @@
+/**
+ * Example schema and query data for reference/seeding.
+ * These are NOT used at runtime - all data comes from the API.
+ * Keep for documentation and potential seed script usage.
+ */
+
 import type {
   KnowledgeNode,
   KnowledgeEdge,
@@ -9,11 +15,7 @@ import type {
   ExampleContent,
 } from '@/types/graph'
 
-// Only schema and example mock data retained for dataset/schema features
-// All other mock data moved to example_data/ folder
-// Tenants, FAQs, Playbooks, Entities, etc. should be fetched from API
-
-export const mockSchemaNodes: KnowledgeNode[] = [
+export const exampleSchemaNodes: KnowledgeNode[] = [
   {
     id: 8,
     tenant_id: 'purchasing',
@@ -89,7 +91,7 @@ export const mockSchemaNodes: KnowledgeNode[] = [
   },
 ]
 
-export const mockSchemaEdges: KnowledgeEdge[] = [
+export const exampleSchemaEdges: KnowledgeEdge[] = [
   { id: 8, source_id: 8, target_id: 9, edge_type: 'parent', weight: 1.0, is_auto_generated: false, created_at: '2024-06-06T10:00:00Z' },
   { id: 9, source_id: 10, target_id: 8, edge_type: 'example_of', weight: 1.0, is_auto_generated: false, created_at: '2024-06-07T10:00:00Z' },
 ]
