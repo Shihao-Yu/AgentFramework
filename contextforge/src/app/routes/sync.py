@@ -47,7 +47,7 @@ async def get_user_tenant_ids(
     user_id: str,
 ) -> List[str]:
     # TODO: Re-enable tenant permission check once auth is properly integrated
-    return ["shared", "purchasing", "payables", "asset"]
+    return ["default", "shared", "purchasing", "payables", "asset"]
 
 
 @router.get("/status", response_model=SyncStatusResponse)
