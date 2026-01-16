@@ -32,6 +32,7 @@ from app.routes import (
     health_router,
     onboarding_router,
     staging_router,
+    llm_context_router,
 )
 
 
@@ -111,6 +112,7 @@ app.include_router(metrics_router, prefix="/api")
 app.include_router(settings_router, prefix="/api")
 app.include_router(onboarding_router, prefix="/api")
 app.include_router(staging_router, prefix="/api")
+app.include_router(llm_context_router, prefix="/api")
 app.include_router(health_router)
 
 

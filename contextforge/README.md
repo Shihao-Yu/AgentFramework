@@ -182,6 +182,9 @@ def get_inference_client_instance() -> InferenceClient:
 ### Search
 - `POST /api/search` - Hybrid search
 
+### LLM Context (Agent API)
+- `POST /api/llm-context` - Get LLM-optimized hierarchical context
+
 ### Metrics
 - `GET /api/metrics/summary` - Overall statistics
 - `GET /api/metrics/top-items` - Top performing items
