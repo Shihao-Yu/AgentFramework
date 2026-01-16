@@ -180,58 +180,44 @@ app.mount("/", StaticFiles(directory="frontend/dist", html=True))
 
 ## Authentication
 
-### Header-Based Auth (Behind Gateway)
+### JWKS Authentication (Recommended)
 
-Use when your app is behind an auth gateway that sets user headers.
-
-```python
-from contextforge import ContextForge
-from contextforge.providers.auth import HeaderAuthProvider
-
-cf = ContextForge(
-    embedding_provider=...,
-    auth_provider=HeaderAuthProvider(
-        user_id_header="X-User-ID",
-        tenant_id_header="X-Tenant-ID",
-        roles_header="X-User-Roles",
-    ),
-)
-```
-
-### JWT Authentication
-
-Validate JWT tokens directly.
+Use JWKS-based authentication for production. Supports Azure AD and ADFS.
 
 ```python
 from contextforge import ContextForge
-from contextforge.providers.auth import JWTAuthProvider
+from contextforge.providers.auth import JWKSAuthProvider
 
+# Azure AD
 cf = ContextForge(
     embedding_provider=...,
-    auth_provider=JWTAuthProvider(
-        secret_key="your-secret-key",  # Or set JWT_SECRET_KEY env var
-        algorithms=["HS256"],
+    auth_provider=JWKSAuthProvider(
+        jwks_url="https://login.microsoftonline.com/{tenant}/discovery/v2.0/keys",
+        issuer="https://login.microsoftonline.com/{tenant}/v2.0",
+        audience="api://your-app-id",
     ),
 )
-```
 
-**Expected JWT payload:**
-```json
-{
-  "sub": "user-123",
-  "tenants": ["tenant-a", "tenant-b"],
-  "roles": ["editor"],
-  "exp": 1699999999
-}
+# Azure AD + ADFS fallback
+cf = ContextForge(
+    embedding_provider=...,
+    auth_provider=JWKSAuthProvider(
+        jwks_url="https://login.microsoftonline.com/{tenant}/discovery/v2.0/keys",
+        issuer="https://login.microsoftonline.com/{tenant}/v2.0",
+        audience="api://your-app-id",
+        fallback_jwks_url="https://adfs.company.com/adfs/discovery/keys",
+        fallback_issuer="https://adfs.company.com/adfs",
+    ),
+)
 ```
 
 ### Custom Auth Provider
 
-Integrate with your existing auth system.
+Integrate with your existing auth system by implementing the protocol.
 
 ```python
 from contextforge import ContextForge
-from contextforge.protocols.auth import AuthProvider, AuthContext
+from contextforge.protocols.auth import AuthContext
 from fastapi import Request
 
 class MyAuthProvider:
@@ -438,7 +424,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from contextforge import ContextForge, ContextForgeConfig
 from contextforge.providers.embedding import SentenceTransformersProvider
-from contextforge.providers.auth import JWTAuthProvider
+from contextforge.providers.auth import JWKSAuthProvider
 
 # Validate required config
 if not os.environ.get("DATABASE_URL"):
@@ -453,8 +439,10 @@ cf = ContextForge(
         cors_origins="https://app.acme.com",
     ),
     embedding_provider=SentenceTransformersProvider(),
-    auth_provider=JWTAuthProvider(
-        secret_key=os.environ["JWT_SECRET_KEY"],
+    auth_provider=JWKSAuthProvider(
+        jwks_url=os.environ["AUTH_JWKS_URL"],
+        issuer=os.environ["AUTH_ISSUER"],
+        audience=os.environ.get("AUTH_AUDIENCE"),
     ),
 )
 

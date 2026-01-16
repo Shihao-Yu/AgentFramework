@@ -5,7 +5,7 @@ Example: Integrating ContextForge into an existing FastAPI application.
 REQUIRED: Set DATABASE_URL environment variable before running.
 
     export DATABASE_URL="postgresql+asyncpg://user:pass@host/db"
-    python examples/library_integration.py [basic|full|openai|jwt]
+    python examples/library_integration.py [basic|full|openai|jwks]
 """
 
 import os
@@ -127,25 +127,37 @@ def create_openai_app() -> FastAPI:
 
 
 # =============================================================================
-# Example 4: JWT Authentication
+# Example 4: JWKS Authentication (Azure AD, Okta, Auth0)
 # =============================================================================
 
-def create_jwt_app() -> FastAPI:
-    """Integration with JWT authentication."""
+def create_jwks_app() -> FastAPI:
+    """Integration with JWKS-based authentication (Azure AD / ADFS)."""
     from contextforge import ContextForge, ContextForgeConfig
     from contextforge.providers.embedding import SentenceTransformersProvider
-    from contextforge.providers.auth import JWTAuthProvider
+    from contextforge.providers.auth import JWKSAuthProvider
     
     database_url = _require_database_url()
-    jwt_secret = os.environ.get("JWT_SECRET_KEY")
-    if not jwt_secret:
-        print("ERROR: JWT_SECRET_KEY environment variable is required for this example.")
+    
+    jwks_url = os.environ.get("AUTH_JWKS_URL")
+    issuer = os.environ.get("AUTH_ISSUER")
+    audience = os.environ.get("AUTH_AUDIENCE")
+    
+    if not all([jwks_url, issuer]):
+        print("ERROR: AUTH_JWKS_URL and AUTH_ISSUER environment variables are required.")
+        print("\nAzure AD example:")
+        print('  export AUTH_JWKS_URL="https://login.microsoftonline.com/{tenant}/discovery/v2.0/keys"')
+        print('  export AUTH_ISSUER="https://login.microsoftonline.com/{tenant}/v2.0"')
+        print('  export AUTH_AUDIENCE="api://your-app-id"')
         sys.exit(1)
     
     cf = ContextForge(
         config=ContextForgeConfig(database_url=database_url),
         embedding_provider=SentenceTransformersProvider(),
-        auth_provider=JWTAuthProvider(secret_key=jwt_secret),
+        auth_provider=JWKSAuthProvider(
+            jwks_url=jwks_url,
+            issuer=issuer,
+            audience=audience,
+        ),
     )
     
     @asynccontextmanager
@@ -170,7 +182,7 @@ if __name__ == "__main__":
         "basic": create_basic_app,
         "full": create_full_app,
         "openai": create_openai_app,
-        "jwt": create_jwt_app,
+        "jwks": create_jwks_app,
     }
     
     example = sys.argv[1] if len(sys.argv) > 1 else "basic"

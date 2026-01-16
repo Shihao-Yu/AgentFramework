@@ -101,28 +101,29 @@ The main entry point for the library. Provides factory methods for services and 
 ```python
 from contextforge import ContextForge, ContextForgeConfig
 from contextforge.providers.embedding import SentenceTransformersProvider
-from contextforge.providers.auth import HeaderAuthProvider
+from contextforge.providers.auth import JWKSAuthProvider
 
 # Minimal setup (uses defaults)
 cf = ContextForge(database_url="postgresql+asyncpg://localhost/mydb")
 
-# Full configuration
+# Full configuration with Azure AD auth
 cf = ContextForge(
     config=ContextForgeConfig(
         database_url="postgresql+asyncpg://localhost/mydb",
-        db_schema="agent",                    # Default: "agent"
+        db_schema="agent",
         search_bm25_weight=0.4,
         search_vector_weight=0.6,
-        admin_ui_enabled=True,                # Serve Admin UI at /admin
+        admin_ui_enabled=True,
         admin_ui_path="/admin",
     ),
     embedding_provider=SentenceTransformersProvider(
-        model_name="all-MiniLM-L6-v2",        # Default model
+        model_name="all-MiniLM-L6-v2",
     ),
-    llm_provider=None,                        # Optional
-    auth_provider=HeaderAuthProvider(
-        user_id_header="X-User-ID",
-        tenant_id_header="X-Tenant-ID",
+    llm_provider=None,
+    auth_provider=JWKSAuthProvider(
+        jwks_url="https://login.microsoftonline.com/{tenant}/discovery/v2.0/keys",
+        issuer="https://login.microsoftonline.com/{tenant}/v2.0",
+        audience="api://your-app-id",
     ),
 )
 
