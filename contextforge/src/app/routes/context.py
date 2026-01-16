@@ -41,7 +41,7 @@ async def get_context(
     request: ContextRequest,
     session: AsyncSession = Depends(get_session),
     embedding_client: EmbeddingClient = Depends(get_embedding_client),
-    current_user: str = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
 ):
     """
     Get structured context for AI agent.
@@ -54,7 +54,8 @@ async def get_context(
     - **entities**: Business entities related to the query
     - **stats**: Search and expansion statistics
     """
-    user_tenant_ids = await get_user_tenant_ids(session, current_user)
+    email = current_user["email"]
+    user_tenant_ids = await get_user_tenant_ids(session, user_id)
     
     if not request.tenant_ids:
         request.tenant_ids = user_tenant_ids

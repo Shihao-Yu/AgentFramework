@@ -65,10 +65,11 @@ async def get_user_tenant_ids(
 @router.get("/stats", response_model=GraphStatsResponse)
 async def get_graph_stats(
     session: AsyncSession = Depends(get_session),
-    current_user: str = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
     service: GraphService = Depends(get_graph_service),
 ):
-    user_tenant_ids = await get_user_tenant_ids(session, current_user)
+    email = current_user["email"]
+    user_tenant_ids = await get_user_tenant_ids(session, email)
     
     stats = await service.get_graph_stats(user_tenant_ids)
     
@@ -81,10 +82,11 @@ async def get_neighbors(
     depth: int = Query(1, ge=1, le=3),
     edge_types: Optional[List[str]] = Query(None),
     session: AsyncSession = Depends(get_session),
-    current_user: str = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
     service: GraphService = Depends(get_graph_service),
 ):
-    user_tenant_ids = await get_user_tenant_ids(session, current_user)
+    email = current_user["email"]
+    user_tenant_ids = await get_user_tenant_ids(session, email)
     
     neighbors = await service.get_neighbors(
         node_id, user_tenant_ids, depth, edge_types
@@ -99,10 +101,11 @@ async def find_paths(
     target_id: int,
     max_depth: int = Query(5, ge=1, le=10),
     session: AsyncSession = Depends(get_session),
-    current_user: str = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
     service: GraphService = Depends(get_graph_service),
 ):
-    user_tenant_ids = await get_user_tenant_ids(session, current_user)
+    email = current_user["email"]
+    user_tenant_ids = await get_user_tenant_ids(session, email)
     
     paths = await service.find_paths(
         source_id, target_id, user_tenant_ids, max_depth
@@ -115,10 +118,11 @@ async def find_paths(
 async def get_connected_component(
     node_id: int,
     session: AsyncSession = Depends(get_session),
-    current_user: str = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
     service: GraphService = Depends(get_graph_service),
 ):
-    user_tenant_ids = await get_user_tenant_ids(session, current_user)
+    email = current_user["email"]
+    user_tenant_ids = await get_user_tenant_ids(session, email)
     
     component = await service.get_connected_component(node_id, user_tenant_ids)
     
@@ -128,10 +132,11 @@ async def get_connected_component(
 @router.get("/orphans", response_model=List[NeighborResponse])
 async def find_orphan_nodes(
     session: AsyncSession = Depends(get_session),
-    current_user: str = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
     service: GraphService = Depends(get_graph_service),
 ):
-    user_tenant_ids = await get_user_tenant_ids(session, current_user)
+    email = current_user["email"]
+    user_tenant_ids = await get_user_tenant_ids(session, email)
     
     orphans = await service.find_orphan_nodes(user_tenant_ids)
     
@@ -143,10 +148,11 @@ async def suggest_connections(
     node_id: int,
     limit: int = Query(5, ge=1, le=20),
     session: AsyncSession = Depends(get_session),
-    current_user: str = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
     service: GraphService = Depends(get_graph_service),
 ):
-    user_tenant_ids = await get_user_tenant_ids(session, current_user)
+    email = current_user["email"]
+    user_tenant_ids = await get_user_tenant_ids(session, email)
     
     suggestions = await service.suggest_connections(
         node_id, user_tenant_ids, limit
@@ -158,10 +164,11 @@ async def suggest_connections(
 @router.post("/reload")
 async def reload_graph(
     session: AsyncSession = Depends(get_session),
-    current_user: str = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
     service: GraphService = Depends(get_graph_service),
 ):
-    user_tenant_ids = await get_user_tenant_ids(session, current_user)
+    email = current_user["email"]
+    user_tenant_ids = await get_user_tenant_ids(session, email)
     
     service.clear_cache()
     await service.load_graph(user_tenant_ids, force_reload=True)

@@ -23,7 +23,7 @@ async def search_knowledge(
     request: SearchRequest,
     session: AsyncSession = Depends(get_session),
     embedding_client: EmbeddingClient = Depends(get_embedding_client),
-    current_user: str = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
     x_session_id: Optional[str] = Header(None, alias="X-Session-ID"),
     _rate_limit: None = Depends(rate_limit_dependency(
         limit=settings.RATE_LIMIT_SEARCH_LIMIT,
@@ -42,10 +42,11 @@ async def search_knowledge(
     Headers:
     - X-Session-ID: Optional session ID for analytics tracking
     """
+    email = current_user["email"]
     
     service = SearchService(session, embedding_client)
     return await service.hybrid_search(
         request,
         session_id=x_session_id,
-        user_id=current_user if current_user != "anonymous" else None
+        user_id=user_id if user_id != "anonymous" else None
     )

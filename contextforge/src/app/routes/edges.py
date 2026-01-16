@@ -42,9 +42,10 @@ async def list_edges(
     page: int = Query(1, ge=1),
     limit: int = Query(50, ge=1, le=200),
     session: AsyncSession = Depends(get_session),
-    current_user: str = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
 ):
-    user_tenant_ids = await get_user_tenant_ids(session, current_user)
+    email = current_user["email"]
+    user_tenant_ids = await get_user_tenant_ids(session, email)
     
     params = EdgeListParams(
         node_id=node_id,
@@ -70,9 +71,10 @@ async def list_edges(
 async def get_edge(
     edge_id: int,
     session: AsyncSession = Depends(get_session),
-    current_user: str = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
 ):
-    user_tenant_ids = await get_user_tenant_ids(session, current_user)
+    email = current_user["email"]
+    user_tenant_ids = await get_user_tenant_ids(session, email)
     
     service = EdgeService(session)
     edge = await service.get_edge(edge_id, user_tenant_ids)
@@ -90,13 +92,14 @@ async def get_edge(
 async def create_edge(
     data: EdgeCreate,
     session: AsyncSession = Depends(get_session),
-    current_user: str = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
 ):
-    user_tenant_ids = await get_user_tenant_ids(session, current_user)
+    email = current_user["email"]
+    user_tenant_ids = await get_user_tenant_ids(session, email)
     
     service = EdgeService(session)
     try:
-        edge = await service.create_edge(data, user_tenant_ids, created_by=current_user)
+        edge = await service.create_edge(data, user_tenant_ids, created_by=email)
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -116,12 +119,13 @@ async def create_edge(
 async def create_edges_bulk(
     data: EdgeBulkCreate,
     session: AsyncSession = Depends(get_session),
-    current_user: str = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
 ):
-    user_tenant_ids = await get_user_tenant_ids(session, current_user)
+    email = current_user["email"]
+    user_tenant_ids = await get_user_tenant_ids(session, email)
     
     service = EdgeService(session)
-    edges = await service.create_edges_bulk(data.edges, user_tenant_ids, created_by=current_user)
+    edges = await service.create_edges_bulk(data.edges, user_tenant_ids, created_by=email)
     
     responses = []
     for edge in edges:
@@ -137,9 +141,10 @@ async def update_edge(
     edge_id: int,
     data: EdgeUpdate,
     session: AsyncSession = Depends(get_session),
-    current_user: str = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
 ):
-    user_tenant_ids = await get_user_tenant_ids(session, current_user)
+    email = current_user["email"]
+    user_tenant_ids = await get_user_tenant_ids(session, email)
     
     service = EdgeService(session)
     edge = await service.update_edge(edge_id, data, user_tenant_ids)
@@ -157,9 +162,10 @@ async def update_edge(
 async def delete_edge(
     edge_id: int,
     session: AsyncSession = Depends(get_session),
-    current_user: str = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
 ):
-    user_tenant_ids = await get_user_tenant_ids(session, current_user)
+    email = current_user["email"]
+    user_tenant_ids = await get_user_tenant_ids(session, email)
     
     service = EdgeService(session)
     success = await service.delete_edge(edge_id, user_tenant_ids)

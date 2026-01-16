@@ -32,9 +32,9 @@ class UserTenantAccess(SQLModel, table=True):
     __tablename__ = "user_tenant_access"
     __table_args__ = {"schema": _SCHEMA}
     
-    user_id: str = Field(primary_key=True, max_length=100)
+    email: str = Field(primary_key=True, max_length=255)
     tenant_id: str = Field(primary_key=True, max_length=100, foreign_key=f"{_SCHEMA}.tenants.id")
     role: TenantRole = Field(default=TenantRole.VIEWER, sa_column=Column(String(50)))
     
     granted_at: Optional[datetime] = Field(default_factory=datetime.utcnow)
-    granted_by: Optional[str] = Field(default=None, max_length=100)
+    granted_by: Optional[str] = Field(default=None, max_length=255)

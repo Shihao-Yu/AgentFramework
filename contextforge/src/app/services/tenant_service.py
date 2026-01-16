@@ -115,37 +115,37 @@ class TenantService:
         await self.session.commit()
         return True
     
-    async def get_user_tenants(self, user_id: str) -> List[str]:
+    async def get_user_tenants(self, email: str) -> List[str]:
         result = await self.session.execute(
             text(schema_sql("""
                 SELECT uta.tenant_id 
                 FROM {schema}.user_tenant_access uta
                 JOIN {schema}.tenants t ON uta.tenant_id = t.id
-                WHERE uta.user_id = :user_id AND t.is_active = TRUE
+                WHERE uta.email = :email AND t.is_active = TRUE
             """)),
-            {"user_id": user_id}
+            {"email": email}
         )
         return [row.tenant_id for row in result.fetchall()]
     
     async def get_user_tenant_access(
         self,
-        user_id: str,
+        email: str,
     ) -> List[UserTenantAccessResponse]:
         result = await self.session.execute(
             text(schema_sql("""
-                SELECT uta.user_id, uta.tenant_id, uta.role, uta.granted_at, 
+                SELECT uta.email, uta.tenant_id, uta.role, uta.granted_at, 
                        uta.granted_by, t.name as tenant_name
                 FROM {schema}.user_tenant_access uta
                 JOIN {schema}.tenants t ON uta.tenant_id = t.id
-                WHERE uta.user_id = :user_id AND t.is_active = TRUE
+                WHERE uta.email = :email AND t.is_active = TRUE
                 ORDER BY t.name
             """)),
-            {"user_id": user_id}
+            {"email": email}
         )
         
         return [
             UserTenantAccessResponse(
-                user_id=row.user_id,
+                email=row.email,
                 tenant_id=row.tenant_id,
                 role=TenantRole(row.role),
                 granted_at=row.granted_at,
@@ -166,7 +166,7 @@ class TenantService:
         
         existing = await self.session.execute(
             select(UserTenantAccess).where(
-                UserTenantAccess.user_id == data.user_id,
+                UserTenantAccess.email == data.email,
                 UserTenantAccess.tenant_id == data.tenant_id,
             )
         )
@@ -174,7 +174,7 @@ class TenantService:
             return None
         
         access = UserTenantAccess(
-            user_id=data.user_id,
+            email=data.email,
             tenant_id=data.tenant_id,
             role=data.role,
             granted_by=granted_by,
@@ -188,12 +188,12 @@ class TenantService:
     
     async def update_tenant_access(
         self,
-        user_id: str,
+        email: str,
         tenant_id: str,
         data: UserTenantAccessUpdate,
     ) -> Optional[UserTenantAccess]:
         query = select(UserTenantAccess).where(
-            UserTenantAccess.user_id == user_id,
+            UserTenantAccess.email == email,
             UserTenantAccess.tenant_id == tenant_id,
         )
         result = await self.session.execute(query)
@@ -211,11 +211,11 @@ class TenantService:
     
     async def revoke_tenant_access(
         self,
-        user_id: str,
+        email: str,
         tenant_id: str,
     ) -> bool:
         query = select(UserTenantAccess).where(
-            UserTenantAccess.user_id == user_id,
+            UserTenantAccess.email == email,
             UserTenantAccess.tenant_id == tenant_id,
         )
         result = await self.session.execute(query)
@@ -231,12 +231,12 @@ class TenantService:
     
     async def check_user_access(
         self,
-        user_id: str,
+        email: str,
         tenant_id: str,
         required_role: Optional[TenantRole] = None,
     ) -> bool:
         query = select(UserTenantAccess).where(
-            UserTenantAccess.user_id == user_id,
+            UserTenantAccess.email == email,
             UserTenantAccess.tenant_id == tenant_id,
         )
         result = await self.session.execute(query)
@@ -268,7 +268,7 @@ class TenantService:
     async def _get_tenant_user_count(self, tenant_id: str) -> int:
         result = await self.session.execute(
             text(schema_sql("""
-                SELECT COUNT(DISTINCT user_id) FROM {schema}.user_tenant_access 
+                SELECT COUNT(DISTINCT email) FROM {schema}.user_tenant_access 
                 WHERE tenant_id = :tenant_id
             """)),
             {"tenant_id": tenant_id}

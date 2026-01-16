@@ -556,6 +556,7 @@ def test_retrieval(ctx, dataset_name: str, question: str, top_k: int, strategy: 
                 # Hybrid or Vector search using hybrid_search_nodes function
                 embedding_client = get_embedding_client_instance()
                 query_embedding = await embedding_client.embed(question)
+                embedding_str = "[" + ",".join(str(x) for x in query_embedding) + "]"
                 
                 # Set weights based on strategy
                 if effective_strategy == "vector":
@@ -579,7 +580,7 @@ def test_retrieval(ctx, dataset_name: str, question: str, top_k: int, strategy: 
                     """),
                     {
                         "query_text": question,
-                        "query_embedding": query_embedding,
+                        "query_embedding": embedding_str,
                         "tenant_ids": [tenant_id],
                         "node_types": [NodeType.SCHEMA_FIELD.value],
                         "bm25_weight": bm25_weight,

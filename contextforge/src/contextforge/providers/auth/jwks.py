@@ -46,15 +46,9 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class JWTValidationResult:
-    """
-    Immutable container for JWT validation results.
-    
-    Thread-safe and suitable for concurrent access.
-    All collections are immutable (frozenset, tuple).
-    """
+    """Immutable JWT validation result. Thread-safe with frozen collections."""
     token: str
     decoded_claims: Dict[str, Any]
-    user_id: str
     email: str
     display_name: str
     groups: FrozenSet[str] = field(default_factory=frozenset)
@@ -104,40 +98,18 @@ class JWKSCache:
 
 class JWKSAuthProvider:
     """
-    Enterprise-grade JWT authentication provider with JWKS support.
+    JWKS-based JWT authentication for Azure AD and ADFS.
     
-    Features:
-    - JWKS key caching with automatic expiration
-    - Multiple issuer support (Azure AD + ADFS fallback)
-    - RS256/RS384/RS512 algorithm support
-    - Configurable claim mapping
-    - Thread-safe operation
-    
-    Args:
-        jwks_url: Primary JWKS endpoint URL
-        issuer: Expected token issuer (or list of issuers)
-        audience: Expected token audience (optional)
-        algorithms: Allowed signing algorithms (default: ["RS256"])
-        cache_ttl_minutes: JWKS cache TTL (default: 60)
-        user_id_claim: Claim for user ID (default: "sub")
-        email_claim: Claim for email (default: "email", falls back to "upn")
-        name_claim: Claim for display name (default: "name")
-        groups_claim: Claim for group memberships (default: "groups")
-        roles_claim: Claim for roles (default: "roles")
-        admin_role: Role that grants admin access (default: "admin")
-        allow_anonymous: Allow unauthenticated requests (default: False)
-        fallback_jwks_url: Secondary JWKS endpoint for failover (optional)
-        fallback_issuer: Secondary issuer for failover (optional)
+    Features: JWKS key caching, multiple issuer support, RS256 algorithms, thread-safe.
     
     Example - Azure AD:
         provider = JWKSAuthProvider(
             jwks_url="https://login.microsoftonline.com/common/discovery/v2.0/keys",
             issuer="https://login.microsoftonline.com/{tenant-id}/v2.0",
             audience="api://your-client-id",
-            groups_claim="groups",
         )
     
-    Example - Dual provider (Azure AD + ADFS):
+    Example - Azure AD + ADFS fallback:
         provider = JWKSAuthProvider(
             jwks_url="https://login.microsoftonline.com/common/discovery/v2.0/keys",
             issuer="https://login.microsoftonline.com/{tenant}/v2.0",
@@ -154,7 +126,6 @@ class JWKSAuthProvider:
         audience: Optional[str | List[str]] = None,
         algorithms: Optional[List[str]] = None,
         cache_ttl_minutes: int = 60,
-        user_id_claim: str = "sub",
         email_claim: str = "email",
         name_claim: str = "name",
         groups_claim: str = "groups",
@@ -174,13 +145,10 @@ class JWKSAuthProvider:
         self._algorithms = algorithms or ["RS256"]
         self._verify_ssl = verify_ssl
         
-        # Fallback configuration
         self._fallback_jwks_url = fallback_jwks_url
         if fallback_issuer:
             self._issuers.append(fallback_issuer)
         
-        # Claim mapping
-        self._user_id_claim = user_id_claim
         self._email_claim = email_claim
         self._name_claim = name_claim
         self._groups_claim = groups_claim
@@ -359,11 +327,6 @@ class JWKSAuthProvider:
         token: str, 
         claims: Dict[str, Any]
     ) -> JWTValidationResult:
-        """Extract user info from validated claims into immutable result."""
-        # User ID
-        user_id = str(claims.get(self._user_id_claim, claims.get("sub", "unknown")))
-        
-        # Email - try multiple claim names
         email = (
             claims.get(self._email_claim) or 
             claims.get("upn") or 
@@ -371,33 +334,28 @@ class JWKSAuthProvider:
             ""
         )
         
-        # Display name
         display_name = (
             claims.get(self._name_claim) or
             claims.get("given_name", "") + " " + claims.get("family_name", "") or
             email.split("@")[0] if email else "Unknown"
         ).strip()
         
-        # Groups - handle both list and single value
         raw_groups = claims.get(self._groups_claim, [])
         if isinstance(raw_groups, str):
             raw_groups = [raw_groups]
         groups = frozenset(str(g) for g in raw_groups)
         
-        # Roles - try multiple claim names (Azure AD uses 'roles', others use 'role')
         raw_roles = claims.get(self._roles_claim) or claims.get("role", [])
         if isinstance(raw_roles, str):
             raw_roles = [raw_roles]
         roles = frozenset(str(r) for r in raw_roles)
         
-        # Timestamps
         exp = claims.get("exp")
         iat = claims.get("iat")
         
         return JWTValidationResult(
             token=token,
             decoded_claims=claims,
-            user_id=user_id,
             email=email,
             display_name=display_name,
             groups=groups,
@@ -426,7 +384,7 @@ class JWKSAuthProvider:
         if not token:
             if self._allow_anonymous:
                 return AuthContext(
-                    user_id="anonymous",
+                    email="anonymous@local",
                     tenant_ids=[],
                     roles=[],
                     is_admin=False,
@@ -436,12 +394,11 @@ class JWKSAuthProvider:
         result = await self._validate_token(token)
         
         return AuthContext(
-            user_id=result.user_id,
-            tenant_ids=list(result.groups),  # Map groups to tenants
+            email=result.email,
+            tenant_ids=list(result.groups),
             roles=list(result.roles),
             is_admin=self._admin_role in result.roles,
             metadata={
-                "email": result.email,
                 "display_name": result.display_name,
                 "groups": list(result.groups),
                 "issuer": result.issuer,

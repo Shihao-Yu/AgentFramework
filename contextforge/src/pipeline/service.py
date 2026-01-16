@@ -404,6 +404,7 @@ class TicketPipeline:
         ticket: TicketData,
     ) -> int:
         embedding = await self.embedding_client.embed(analysis.question)
+        embedding_str = "[" + ",".join(str(x) for x in embedding) + "]"
 
         variant = NodeVariant(
             node_id=node_id,
@@ -424,7 +425,7 @@ class TicketPipeline:
                 SET embedding = :embedding::vector 
                 WHERE id = :id
             """),
-            {"id": variant.id, "embedding": embedding}
+            {"id": variant.id, "embedding": embedding_str}
         )
 
         return variant.id

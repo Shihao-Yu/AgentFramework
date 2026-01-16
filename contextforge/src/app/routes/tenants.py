@@ -30,11 +30,12 @@ router = APIRouter(prefix="/tenants", tags=["tenants"])
 async def list_tenants(
     include_inactive: bool = Query(False),
     session: AsyncSession = Depends(get_session),
-    current_user: str = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
 ):
     service = TenantService(session)
+    email = current_user["email"]
     
-    user_tenants = await service.get_user_tenants(current_user)
+    user_tenants = await service.get_user_tenants(email)
     if not user_tenants:
         user_tenants = None
     
@@ -49,23 +50,25 @@ async def list_tenants(
 @router.get("/me", response_model=UserTenantsResponse)
 async def get_my_tenants(
     session: AsyncSession = Depends(get_session),
-    current_user: str = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
 ):
     service = TenantService(session)
-    access_list = await service.get_user_tenant_access(current_user)
+    email = current_user["email"]
+    access_list = await service.get_user_tenant_access(email)
     
-    return UserTenantsResponse(user_id=current_user, tenants=access_list)
+    return UserTenantsResponse(email=email, tenants=access_list)
 
 
 @router.get("/{tenant_id}", response_model=TenantResponse)
 async def get_tenant(
     tenant_id: str,
     session: AsyncSession = Depends(get_session),
-    current_user: str = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
 ):
     service = TenantService(session)
+    email = current_user["email"]
     
-    has_access = await service.check_user_access(current_user, tenant_id)
+    has_access = await service.check_user_access(email, tenant_id)
     if not has_access:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -99,9 +102,10 @@ async def get_tenant(
 async def create_tenant(
     data: TenantCreate,
     session: AsyncSession = Depends(get_session),
-    current_user: str = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
 ):
     service = TenantService(session)
+    email = current_user["email"]
     
     existing = await service.get_tenant(data.id)
     if existing:
@@ -114,11 +118,11 @@ async def create_tenant(
     
     await service.grant_tenant_access(
         UserTenantAccessCreate(
-            user_id=current_user,
+            email=email,
             tenant_id=tenant.id,
             role=TenantRole.ADMIN,
         ),
-        granted_by=current_user,
+        granted_by=email,
     )
     
     return TenantResponse(
@@ -139,11 +143,12 @@ async def update_tenant(
     tenant_id: str,
     data: TenantUpdate,
     session: AsyncSession = Depends(get_session),
-    current_user: str = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
 ):
     service = TenantService(session)
+    email = current_user["email"]
     
-    has_access = await service.check_user_access(current_user, tenant_id, TenantRole.ADMIN)
+    has_access = await service.check_user_access(email, tenant_id, TenantRole.ADMIN)
     if not has_access:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -177,11 +182,12 @@ async def update_tenant(
 async def delete_tenant(
     tenant_id: str,
     session: AsyncSession = Depends(get_session),
-    current_user: str = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
 ):
     service = TenantService(session)
+    email = current_user["email"]
     
-    has_access = await service.check_user_access(current_user, tenant_id, TenantRole.ADMIN)
+    has_access = await service.check_user_access(email, tenant_id, TenantRole.ADMIN)
     if not has_access:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -203,7 +209,7 @@ async def grant_access(
     tenant_id: str,
     data: UserTenantAccessCreate,
     session: AsyncSession = Depends(get_session),
-    current_user: str = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
 ):
     if data.tenant_id != tenant_id:
         raise HTTPException(
@@ -212,15 +218,16 @@ async def grant_access(
         )
     
     service = TenantService(session)
+    email = current_user["email"]
     
-    has_access = await service.check_user_access(current_user, tenant_id, TenantRole.ADMIN)
+    has_access = await service.check_user_access(email, tenant_id, TenantRole.ADMIN)
     if not has_access:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Admin access required for tenant {tenant_id}"
         )
     
-    access = await service.grant_tenant_access(data, granted_by=current_user)
+    access = await service.grant_tenant_access(data, granted_by=email)
     if not access:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -230,7 +237,7 @@ async def grant_access(
     tenant = await service.get_tenant(tenant_id)
     
     return UserTenantAccessResponse(
-        user_id=access.user_id,
+        email=access.email,
         tenant_id=access.tenant_id,
         role=access.role,
         granted_at=access.granted_at,
@@ -239,34 +246,35 @@ async def grant_access(
     )
 
 
-@router.put("/{tenant_id}/access/{user_id}", response_model=UserTenantAccessResponse)
+@router.put("/{tenant_id}/access/{target_email}", response_model=UserTenantAccessResponse)
 async def update_access(
     tenant_id: str,
-    user_id: str,
+    target_email: str,
     data: UserTenantAccessUpdate,
     session: AsyncSession = Depends(get_session),
-    current_user: str = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
 ):
     service = TenantService(session)
+    current_email = current_user["email"]
     
-    has_access = await service.check_user_access(current_user, tenant_id, TenantRole.ADMIN)
+    has_access = await service.check_user_access(current_email, tenant_id, TenantRole.ADMIN)
     if not has_access:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Admin access required for tenant {tenant_id}"
         )
     
-    access = await service.update_tenant_access(user_id, tenant_id, data)
+    access = await service.update_tenant_access(target_email, tenant_id, data)
     if not access:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Access not found for user {user_id} on tenant {tenant_id}"
+            detail=f"Access not found for {target_email} on tenant {tenant_id}"
         )
     
     tenant = await service.get_tenant(tenant_id)
     
     return UserTenantAccessResponse(
-        user_id=access.user_id,
+        email=access.email,
         tenant_id=access.tenant_id,
         role=access.role,
         granted_at=access.granted_at,
@@ -275,27 +283,28 @@ async def update_access(
     )
 
 
-@router.delete("/{tenant_id}/access/{user_id}", response_model=SuccessResponse)
+@router.delete("/{tenant_id}/access/{target_email}", response_model=SuccessResponse)
 async def revoke_access(
     tenant_id: str,
-    user_id: str,
+    target_email: str,
     session: AsyncSession = Depends(get_session),
-    current_user: str = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
 ):
     service = TenantService(session)
+    current_email = current_user["email"]
     
-    has_access = await service.check_user_access(current_user, tenant_id, TenantRole.ADMIN)
+    has_access = await service.check_user_access(current_email, tenant_id, TenantRole.ADMIN)
     if not has_access:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Admin access required for tenant {tenant_id}"
         )
     
-    success = await service.revoke_tenant_access(user_id, tenant_id)
+    success = await service.revoke_tenant_access(target_email, tenant_id)
     if not success:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Access not found for user {user_id} on tenant {tenant_id}"
+            detail=f"Access not found for {target_email} on tenant {tenant_id}"
         )
     
-    return SuccessResponse(success=True, message=f"Access revoked for user {user_id}")
+    return SuccessResponse(success=True, message=f"Access revoked for {target_email}")

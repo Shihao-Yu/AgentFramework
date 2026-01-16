@@ -45,7 +45,7 @@ class TenantListResponse(BaseModel):
 
 
 class UserTenantAccessCreate(BaseModel):
-    user_id: str = Field(..., min_length=1, max_length=100)
+    email: str = Field(..., min_length=1, max_length=255)
     tenant_id: str = Field(..., min_length=1, max_length=100)
     role: TenantRole = TenantRole.VIEWER
 
@@ -55,7 +55,7 @@ class UserTenantAccessUpdate(BaseModel):
 
 
 class UserTenantAccessResponse(BaseModel):
-    user_id: str
+    email: str
     tenant_id: str
     role: TenantRole
     granted_at: datetime
@@ -68,5 +68,5 @@ class UserTenantAccessResponse(BaseModel):
 
 
 class UserTenantsResponse(BaseModel):
-    user_id: str
+    email: str
     tenants: List[UserTenantAccessResponse]

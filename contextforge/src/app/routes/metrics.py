@@ -102,8 +102,8 @@ async def get_item_stats(
 
 @router.get("/heatmap", response_model=HeatmapResponse)
 async def get_heatmap(
-    period: str = Query("7d", regex="^(7d|30d|90d|all)$", description="Time period"),
-    metric: str = Query("hits", regex="^(hits|sessions)$", description="Heat metric"),
+    period: str = Query("7d", pattern="^(7d|30d|90d|all)$", description="Time period"),
+    metric: str = Query("hits", pattern="^(hits|sessions)$", description="Heat metric"),
     node_types: List[str] = Query(None, description="Filter by node types"),
     include_zero: bool = Query(True, description="Include nodes with 0 hits"),
     session: AsyncSession = Depends(get_session),
@@ -127,7 +127,7 @@ async def get_heatmap(
 
 @router.get("/heatmap/tags", response_model=HeatmapTagsResponse)
 async def get_heatmap_by_tags(
-    period: str = Query("7d", regex="^(7d|30d|90d|all)$", description="Time period"),
+    period: str = Query("7d", pattern="^(7d|30d|90d|all)$", description="Time period"),
     limit: int = Query(20, ge=1, le=100, description="Number of tags to return"),
     session: AsyncSession = Depends(get_session),
     current_user: dict = Depends(get_current_user),
@@ -145,7 +145,7 @@ async def get_heatmap_by_tags(
 
 @router.get("/heatmap/types", response_model=HeatmapTypesResponse)
 async def get_heatmap_by_types(
-    period: str = Query("7d", regex="^(7d|30d|90d|all)$", description="Time period"),
+    period: str = Query("7d", pattern="^(7d|30d|90d|all)$", description="Time period"),
     session: AsyncSession = Depends(get_session),
     current_user: dict = Depends(get_current_user),
 ):

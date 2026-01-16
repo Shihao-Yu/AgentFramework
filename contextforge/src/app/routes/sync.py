@@ -53,7 +53,7 @@ async def get_user_tenant_ids(
 @router.get("/status", response_model=SyncStatusResponse)
 async def get_sync_status(
     session: AsyncSession = Depends(get_session),
-    current_user: str = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
 ):
     """Get current graph sync status."""
     service = GraphSyncService(session)
@@ -65,7 +65,7 @@ async def get_sync_status(
 async def process_events(
     batch_size: int = Query(100, ge=1, le=1000),
     session: AsyncSession = Depends(get_session),
-    current_user: str = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
 ):
     """Process pending graph events."""
     service = GraphSyncService(session)
@@ -78,10 +78,11 @@ async def generate_shared_tag_edges(
     min_shared_tags: int = Query(2, ge=1, le=10),
     batch_size: int = Query(1000, ge=1, le=10000),
     session: AsyncSession = Depends(get_session),
-    current_user: str = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
 ):
     """Generate SHARED_TAG edges between nodes with common tags."""
-    user_tenant_ids = await get_user_tenant_ids(session, current_user)
+    email = current_user["email"]
+    user_tenant_ids = await get_user_tenant_ids(session, email)
     
     service = GraphSyncService(session)
     created = await service.generate_shared_tag_edges(
@@ -99,10 +100,11 @@ async def generate_similar_edges(
     batch_size: int = Query(100, ge=1, le=1000),
     session: AsyncSession = Depends(get_session),
     embedding_client: EmbeddingClient = Depends(get_embedding_client),
-    current_user: str = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
 ):
     """Generate SIMILAR edges between nodes with high embedding similarity."""
-    user_tenant_ids = await get_user_tenant_ids(session, current_user)
+    email = current_user["email"]
+    user_tenant_ids = await get_user_tenant_ids(session, email)
     
     service = GraphSyncService(session, embedding_client)
     created = await service.generate_similar_edges(
@@ -120,10 +122,11 @@ async def generate_all_implicit_edges(
     similarity_threshold: float = Query(0.85, ge=0.5, le=0.99),
     session: AsyncSession = Depends(get_session),
     embedding_client: EmbeddingClient = Depends(get_embedding_client),
-    current_user: str = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
 ):
     """Generate all implicit edges (SHARED_TAG and SIMILAR)."""
-    user_tenant_ids = await get_user_tenant_ids(session, current_user)
+    email = current_user["email"]
+    user_tenant_ids = await get_user_tenant_ids(session, email)
     
     service = GraphSyncService(session, embedding_client)
     
@@ -148,9 +151,10 @@ async def generate_all_implicit_edges(
 async def cleanup_old_events(
     days_to_keep: int = Query(30, ge=1, le=365),
     session: AsyncSession = Depends(get_session),
-    current_user: str = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
 ):
     """Delete processed events older than specified days."""
+    email = current_user["email"]  # noqa: F841 - reserved for future permission checks
     service = GraphSyncService(session)
     deleted = await service.cleanup_old_events(days_to_keep)
     
@@ -175,7 +179,7 @@ async def reembed_nodes(
     only_missing: bool = Query(False, description="Only embed nodes without embeddings"),
     session: AsyncSession = Depends(get_session),
     embedding_client: EmbeddingClient = Depends(get_embedding_client),
-    current_user: str = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
 ):
     """
     Regenerate embeddings for all nodes.
@@ -192,7 +196,8 @@ async def reembed_nodes(
     
     Note: This can be slow for large datasets. Consider running during off-hours.
     """
-    user_tenant_ids = await get_user_tenant_ids(session, current_user)
+    email = current_user["email"]
+    user_tenant_ids = await get_user_tenant_ids(session, email)
     
     service = NodeService(session, embedding_client)
     stats = await service.reembed_nodes(

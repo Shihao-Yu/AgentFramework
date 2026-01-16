@@ -229,7 +229,7 @@ class MyAuthProvider:
         user = await self.auth_service.validate(token)
         
         return AuthContext(
-            user_id=user.id,
+            email=user.email,
             tenant_ids=user.tenants,
             roles=user.roles,
             is_admin="admin" in user.roles,

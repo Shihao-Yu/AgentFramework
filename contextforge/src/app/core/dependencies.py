@@ -315,6 +315,34 @@ async def get_optional_inference_client() -> Optional[InferenceClient]:
         return None
 
 
+_jwks_auth_provider = None
+
+
+def _get_jwks_auth_provider():
+    """Lazy-initialize JWKS auth provider from environment."""
+    global _jwks_auth_provider
+    if _jwks_auth_provider is None:
+        jwks_url = os.environ.get("AUTH_JWKS_URL")
+        issuer = os.environ.get("AUTH_ISSUER")
+        audience = os.environ.get("AUTH_AUDIENCE")
+        
+        if not jwks_url or not issuer:
+            raise RuntimeError(
+                "AUTH_MODE=jwks requires AUTH_JWKS_URL and AUTH_ISSUER environment variables"
+            )
+        
+        from contextforge.providers.auth import JWKSAuthProvider
+        
+        _jwks_auth_provider = JWKSAuthProvider(
+            jwks_url=jwks_url,
+            issuer=issuer,
+            audience=audience,
+            fallback_jwks_url=os.environ.get("AUTH_FALLBACK_JWKS_URL"),
+            fallback_issuer=os.environ.get("AUTH_FALLBACK_ISSUER"),
+        )
+    return _jwks_auth_provider
+
+
 async def get_current_user(
     authorization: Optional[str] = Header(None, alias="Authorization"),
     x_user_id: Optional[str] = Header(None, alias="X-User-ID"),
@@ -326,71 +354,70 @@ async def get_current_user(
     Authentication modes (configured via AUTH_MODE env var):
     - "none": No authentication (development only)
     - "header": Trust headers from API gateway (X-User-ID, X-Tenant-IDs)
-    - "jwt": Validate JWT token (not yet implemented)
+    - "jwks": Validate JWT token via JWKS endpoint (Azure AD / ADFS)
+    
+    For jwks mode, set these environment variables:
+    - AUTH_JWKS_URL: JWKS endpoint URL
+    - AUTH_ISSUER: Expected token issuer
+    - AUTH_AUDIENCE: Expected token audience (optional)
+    - AUTH_FALLBACK_JWKS_URL: Fallback JWKS endpoint (optional, for ADFS)
+    - AUTH_FALLBACK_ISSUER: Fallback issuer (optional)
     
     Returns:
-        dict with user_id, tenant_ids, and is_authenticated flag
-    
-    Production implementation should:
-    - Set AUTH_MODE=header and configure API gateway to set headers
-    - Or implement JWT validation with proper issuer/audience
+        dict with email, tenant_ids, and is_authenticated flag
     """
-    auth_mode = os.environ.get("AUTH_MODE", "header")
+    auth_mode = os.environ.get("AUTH_MODE", "none")
     
     user_context = {
-        "user_id": "anonymous",
+        "email": "anonymous@local",
         "tenant_ids": ["default", "shared"],
         "is_authenticated": False,
     }
     
     if auth_mode == "none":
-        # Development mode - no auth required
-        user_context["user_id"] = x_user_id or "dev-user"
+        user_context["email"] = x_user_id or "dev-user@local"
         user_context["is_authenticated"] = True
         if x_tenant_ids:
             user_context["tenant_ids"] = [t.strip() for t in x_tenant_ids.split(",")]
         return user_context
     
     if auth_mode == "header":
-        # API gateway mode - trust headers
         if x_user_id:
-            user_context["user_id"] = x_user_id
+            user_context["email"] = x_user_id
             user_context["is_authenticated"] = True
             if x_tenant_ids:
                 user_context["tenant_ids"] = [t.strip() for t in x_tenant_ids.split(",")]
             else:
-                # Default tenants for authenticated users
                 user_context["tenant_ids"] = ["default", "shared"]
         return user_context
     
-    if auth_mode == "jwt":
-        # JWT mode - validate token
-        if authorization and authorization.startswith("Bearer "):
-            # JWT validation placeholder
-            # To implement:
-            # 1. Extract token: token = authorization.replace("Bearer ", "")
-            # 2. Validate token with your auth provider
-            # 3. Extract claims (sub, tenant_ids, etc.)
-            # 4. Return user context
-            #
-            # Example with contextforge.providers.auth.jwt:
-            # from contextforge.providers.auth import JWTAuthProvider
-            # provider = JWTAuthProvider(jwks_url="...")
-            # auth_context = await provider.authenticate(token)
-            # user_context["user_id"] = auth_context.user_id
-            # user_context["tenant_ids"] = auth_context.tenant_ids
-            # user_context["is_authenticated"] = True
-            logger.warning("JWT authentication not implemented. Falling back to anonymous.")
+    if auth_mode == "jwks":
+        if not authorization or not authorization.startswith("Bearer "):
+            return user_context
+        
+        try:
+            provider = _get_jwks_auth_provider()
+            token = authorization[7:]
+            result = await provider.validate_token(token)
+            
+            user_context["email"] = result.email
+            user_context["display_name"] = result.display_name
+            user_context["tenant_ids"] = list(result.groups) if result.groups else ["default"]
+            user_context["roles"] = list(result.roles)
+            user_context["is_authenticated"] = True
+            
+        except Exception as e:
+            logger.warning(f"JWKS token validation failed: {e}")
     
     return user_context
 
 
-# Legacy compatibility - returns just user_id string
-async def get_current_user_id(
+# Legacy compatibility - returns just email string
+async def get_current_user_email(
     user_context: dict = Depends(get_current_user),
 ) -> str:
-    """Get just the user ID (legacy compatibility)."""
-    return user_context.get("user_id", "anonymous")
+    """Get just the user email."""
+    return user_context.get("email", "anonymous@local")
 
 
 async def get_current_user_required(

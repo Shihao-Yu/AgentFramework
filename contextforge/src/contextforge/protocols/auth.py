@@ -16,13 +16,13 @@ class AuthContext:
     Authentication context containing user information.
     
     Attributes:
-        user_id: Unique identifier for the user
+        email: User's email address (primary identifier)
         tenant_ids: List of tenant IDs the user can access
         roles: User's roles (e.g., ["admin", "editor"])
         is_admin: Whether user has admin privileges
-        metadata: Additional user metadata
+        metadata: Additional user metadata (display_name, etc.)
     """
-    user_id: str
+    email: str
     tenant_ids: list[str] = field(default_factory=list)
     roles: list[str] = field(default_factory=list)
     is_admin: bool = False
@@ -52,10 +52,10 @@ class AuthProvider(Protocol):
     Example - Header-based auth:
         class HeaderAuthProvider(AuthProvider):
             async def get_current_user(self, request: Request) -> AuthContext:
-                user_id = request.headers.get("X-User-ID", "anonymous")
+                email = request.headers.get("X-User-Email", "anonymous@local")
                 tenant_id = request.headers.get("X-Tenant-ID", "default")
                 return AuthContext(
-                    user_id=user_id,
+                    email=email,
                     tenant_ids=[tenant_id],
                 )
             
@@ -72,11 +72,11 @@ class AuthProvider(Protocol):
             async def get_current_user(self, request: Request) -> AuthContext:
                 token = request.headers.get("Authorization", "").replace("Bearer ", "")
                 if not token:
-                    return AuthContext(user_id="anonymous")
+                    return AuthContext(email="anonymous@local")
                 
                 payload = jwt.decode(token, self.secret_key, algorithms=["HS256"])
                 return AuthContext(
-                    user_id=payload["sub"],
+                    email=payload.get("email") or payload["sub"],
                     tenant_ids=payload.get("tenants", []),
                     roles=payload.get("roles", []),
                     is_admin="admin" in payload.get("roles", []),

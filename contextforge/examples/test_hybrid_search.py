@@ -76,6 +76,7 @@ async def main():
             
             # Generate query embedding
             query_embedding = await embedding_client.embed(test['query'])
+            embedding_str = "[" + ",".join(str(x) for x in query_embedding) + "]"
             
             # Run hybrid search
             try:
@@ -93,7 +94,7 @@ async def main():
                     """),
                     {
                         "query_text": test['query'],
-                        "query_embedding": query_embedding,
+                        "query_embedding": embedding_str,
                         "tenant_ids": ["demo"],
                         "node_types": test['node_types'],
                         "top_k": 5,
@@ -137,6 +138,7 @@ async def main():
         
         test_query = "pending orders"
         query_embedding = await embedding_client.embed(test_query)
+        embedding_str = "[" + ",".join(str(x) for x in query_embedding) + "]"
         
         weights = [
             (0.4, 0.6, "Default (40% BM25, 60% Vector)"),
@@ -157,7 +159,7 @@ async def main():
                     """),
                     {
                         "query_text": test_query,
-                        "query_embedding": query_embedding,
+                        "query_embedding": embedding_str,
                         "tenant_ids": ["demo"],
                         "node_types": ["schema_field"],
                         "top_k": 3,

@@ -101,6 +101,7 @@ class VariantService:
             raise ValueError("Variant with this text already exists")
 
         embedding = await self.embedding_client.embed(data.variant_text)
+        embedding_str = "[" + ",".join(str(x) for x in embedding) + "]"
 
         variant = NodeVariant(
             node_id=node_id,
@@ -119,7 +120,7 @@ class VariantService:
                 SET embedding = :embedding::vector 
                 WHERE id = :id
             """)),
-            {"id": variant.id, "embedding": embedding}
+            {"id": variant.id, "embedding": embedding_str}
         )
 
         node.graph_version += 1

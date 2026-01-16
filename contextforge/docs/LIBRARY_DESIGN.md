@@ -291,7 +291,7 @@ class AuthProvider(Protocol):
 @dataclass
 class AuthContext:
     """User authentication context."""
-    user_id: str
+    email: str
     tenant_ids: list[str]           # Tenants user can access
     roles: list[str] = field(default_factory=list)
     is_admin: bool = False
@@ -429,11 +429,10 @@ class MyAuthProvider(AuthProvider):
             raise HTTPException(status_code=401, detail="Invalid token")
         
         return AuthContext(
-            user_id=user.id,
+            email=user.email,
             tenant_ids=user.accessible_tenants,
             roles=user.roles,
             is_admin="admin" in user.roles,
-            metadata={"email": user.email},
         )
     
     async def check_tenant_access(
@@ -807,10 +806,9 @@ class MyAuthProvider(AuthProvider):
     async def get_current_user(self, request: Request) -> AuthContext:
         user = await self.validate_token(request)
         
-        # User can access multiple tenants
         return AuthContext(
-            user_id=user.id,
-            tenant_ids=["acme", "shared"],  # Multiple tenants
+            email=user.email,
+            tenant_ids=["acme", "shared"],
             is_admin=user.is_admin,
         )
     
