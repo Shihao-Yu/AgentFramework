@@ -21,9 +21,9 @@ class TestExceptionHierarchy:
         assert isinstance(error, Exception)
 
     def test_configuration_error(self):
-        error = ConfigurationError("Invalid config", config_key="context_db_url")
+        error = ConfigurationError("Invalid config", config_key="framework_db_url")
         assert "Invalid config" in str(error)
-        assert error.config_key == "context_db_url"
+        assert error.config_key == "framework_db_url"
         assert isinstance(error, ContextForgeError)
 
     def test_database_error(self):

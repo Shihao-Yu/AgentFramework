@@ -37,7 +37,7 @@ target_metadata = None
 def get_url():
     """Get database URL from environment or config."""
     # Try environment variable first
-    url = os.getenv("CONTEXT_DB_URL")
+    url = os.getenv("FRAMEWORK_DB_URL")
     if url:
         # Convert async URL to sync URL for alembic
         url = url.replace("+asyncpg", "").replace("postgresql+asyncpg", "postgresql")

@@ -146,7 +146,7 @@ async def test_onboard_dataset(db_session, mock_embedding_client):
 ## Environment Variables
 
 ```bash
-CONTEXT_DB_URL=postgresql+asyncpg://user:pass@localhost/contextforge
+FRAMEWORK_DB_URL=postgresql+asyncpg://user:pass@localhost/contextforge
 EMBEDDING_API_URL=http://localhost:8080/embed
 INFERENCE_API_URL=http://localhost:8081/generate
 ```
@@ -375,7 +375,7 @@ async def search_nodes(
 ### Common Issues
 
 **Database Connection Errors**
-- Verify CONTEXT_DB_URL is correct
+- Verify FRAMEWORK_DB_URL is correct
 - Check PostgreSQL is running
 - Ensure pgvector extension is installed
 

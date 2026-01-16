@@ -10,14 +10,14 @@ TEST_DB_URL = "postgresql+asyncpg://test:test@testhost/testdb"
 
 class TestContextForgeConfig:
 
-    def test_context_db_url_required(self):
-        """Config should require CONTEXT_DB_URL."""
+    def test_framework_db_url_required(self):
+        """Config should require FRAMEWORK_DB_URL."""
         with pytest.raises(ValidationError):
             ContextForgeConfig()
 
     def test_default_values(self):
         """Config should have sensible defaults for non-db settings."""
-        config = ContextForgeConfig(context_db_url=TEST_DB_URL)
+        config = ContextForgeConfig(framework_db_url=TEST_DB_URL)
         
         assert config.db_schema == "agent"
         assert config.db_pool_size == 10
@@ -30,7 +30,7 @@ class TestContextForgeConfig:
     def test_custom_values(self):
         """Config should accept custom values."""
         config = ContextForgeConfig(
-            context_db_url=TEST_DB_URL,
+            framework_db_url=TEST_DB_URL,
             db_schema="custom_schema",
             db_pool_size=20,
             admin_ui_enabled=False,
@@ -43,7 +43,7 @@ class TestContextForgeConfig:
     def test_cors_origins_list(self):
         """cors_origins should be parsed into list."""
         config = ContextForgeConfig(
-            context_db_url=TEST_DB_URL,
+            framework_db_url=TEST_DB_URL,
             cors_origins="http://app.example.com,http://admin.example.com",
         )
         
@@ -53,15 +53,15 @@ class TestContextForgeConfig:
         ]
 
     def test_env_variable_loading(self, monkeypatch):
-        """Config should load CONTEXT_DB_URL from env."""
-        monkeypatch.setenv("CONTEXT_DB_URL", "postgresql://envhost/envdb")
+        """Config should load FRAMEWORK_DB_URL from env."""
+        monkeypatch.setenv("FRAMEWORK_DB_URL", "postgresql://envhost/envdb")
         
         config = ContextForgeConfig()
         
-        assert config.context_db_url == "postgresql+asyncpg://envhost/envdb"
+        assert config.framework_db_url == "postgresql+asyncpg://envhost/envdb"
 
     def test_sync_url_auto_converted(self):
         """postgresql:// should auto-convert to postgresql+asyncpg://"""
-        config = ContextForgeConfig(context_db_url="postgresql://host/db")
+        config = ContextForgeConfig(framework_db_url="postgresql://host/db")
         
-        assert config.context_db_url == "postgresql+asyncpg://host/db"
+        assert config.framework_db_url == "postgresql+asyncpg://host/db"

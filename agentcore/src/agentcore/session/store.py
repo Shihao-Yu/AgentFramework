@@ -56,7 +56,7 @@ class SessionStore:
         """
         self._settings = settings or SessionSettings()
         self._engine = create_async_engine(
-            self._settings.context_db_url,
+            self._settings.framework_db_url,
             pool_size=self._settings.pool_size,
             max_overflow=self._settings.max_overflow,
             pool_timeout=self._settings.pool_timeout,

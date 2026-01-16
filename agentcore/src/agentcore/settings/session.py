@@ -8,7 +8,7 @@ class SessionSettings(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="SESSION_")
 
-    context_db_url: str = "postgresql+asyncpg://localhost:5432/agent_sessions"
+    framework_db_url: str = "postgresql+asyncpg://localhost:5432/agent_sessions"
     db_schema: str = "agent"
     pool_size: int = 5
     max_overflow: int = 10

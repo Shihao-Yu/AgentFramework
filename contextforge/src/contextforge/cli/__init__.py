@@ -43,11 +43,11 @@ def get_config() -> ContextForgeConfig:
 )
 @click.option(
     "--database-url",
-    envvar="CONTEXT_DB_URL",
+    envvar="FRAMEWORK_DB_URL",
     help="Database URL (overrides config)",
 )
 @click.pass_context
-def cli(ctx, config_file: Optional[str], context_db_url: Optional[str]):
+def cli(ctx, config_file: Optional[str], framework_db_url: Optional[str]):
     """
     ContextForge CLI - Knowledge management library utilities.
     
@@ -63,8 +63,8 @@ def cli(ctx, config_file: Optional[str], context_db_url: Optional[str]):
         config = get_config()
     
     # Override database URL if provided
-    if context_db_url:
-        config = ContextForgeConfig(context_db_url=context_db_url)
+    if framework_db_url:
+        config = ContextForgeConfig(framework_db_url=framework_db_url)
     
     ctx.obj["config"] = config
 
@@ -107,7 +107,7 @@ def db_init(ctx, schema: Optional[str]):
         
         # Need sync connection for schema/extension creation
         # Convert async URL to sync URL
-        sync_url = config.context_db_url.replace(
+        sync_url = config.framework_db_url.replace(
             "postgresql+asyncpg://",
             "postgresql://"
         )
@@ -204,7 +204,7 @@ def db_upgrade(ctx, revision: str, dry_run: bool):
         # Override database URL
         alembic_cfg.set_main_option(
             "sqlalchemy.url",
-            config.context_db_url.replace("+asyncpg", ""),
+            config.framework_db_url.replace("+asyncpg", ""),
         )
         
         if dry_run:
@@ -263,7 +263,7 @@ def db_downgrade(ctx, revision: str, dry_run: bool):
         alembic_cfg = Config(str(alembic_ini))
         alembic_cfg.set_main_option(
             "sqlalchemy.url",
-            config.context_db_url.replace("+asyncpg", ""),
+            config.framework_db_url.replace("+asyncpg", ""),
         )
         
         if dry_run:
@@ -301,7 +301,7 @@ def db_status(ctx):
         from sqlalchemy import create_engine
         
         alembic_cfg = Config(str(alembic_ini))
-        sync_url = config.context_db_url.replace("+asyncpg", "")
+        sync_url = config.framework_db_url.replace("+asyncpg", "")
         alembic_cfg.set_main_option("sqlalchemy.url", sync_url)
         
         # Get current revision
@@ -360,7 +360,7 @@ def db_check(ctx):
         from sqlalchemy.ext.asyncio import create_async_engine
         from sqlalchemy import text
         
-        engine = create_async_engine(config.context_db_url)
+        engine = create_async_engine(config.framework_db_url)
         
         try:
             async with engine.connect() as conn:
@@ -440,7 +440,7 @@ def info(ctx):
     
     click.echo("\nContextForge Configuration")
     click.echo("=" * 40)
-    click.echo(f"  Database URL: {_mask_password(config.context_db_url)}")
+    click.echo(f"  Database URL: {_mask_password(config.framework_db_url)}")
     click.echo(f"  Schema: {config.db_schema}")
     click.echo(f"  Pool Size: {config.db_pool_size}")
     click.echo("\n  Features:")

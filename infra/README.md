@@ -127,7 +127,7 @@ async with pg.session() as session:
 | `LANGFUSE_SECRET_KEY` | Langfuse secret key | - |
 | `LANGFUSE_HOST` | Langfuse host | `https://cloud.langfuse.com` |
 | `REDIS_URL` | Redis connection URL | `redis://localhost:6379` |
-| `CONTEXT_DB_URL` | PostgreSQL connection URL | - |
+| `FRAMEWORK_DB_URL` | PostgreSQL connection URL | - |
 | `CLICKHOUSE_HOST` | ClickHouse host | `localhost` |
 
 ## Development

@@ -5,7 +5,7 @@ from typing import Any, AsyncGenerator, Optional
 
 class PostgresClient:
     def __init__(self, url: Optional[str] = None, echo: bool = False):
-        self._url = url or os.environ.get("CONTEXT_DB_URL", "")
+        self._url = url or os.environ.get("FRAMEWORK_DB_URL", "")
         self._echo = echo
         self._engine = None
         self._session_factory = None

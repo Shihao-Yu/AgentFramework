@@ -11,7 +11,7 @@ A comprehensive knowledge management library that provides:
 Quick Start:
     from contextforge import ContextForge
     
-    cf = ContextForge(context_db_url="postgresql+asyncpg://...")
+    cf = ContextForge(framework_db_url="postgresql+asyncpg://...")
     app.include_router(cf.router, prefix="/api/kb")
 
 Full Configuration:
@@ -20,7 +20,7 @@ Full Configuration:
     
     cf = ContextForge(
         config=ContextForgeConfig(
-            context_db_url="postgresql+asyncpg://...",
+            framework_db_url="postgresql+asyncpg://...",
             db_schema="agent",
             admin_ui_enabled=True,
         ),
