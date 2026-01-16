@@ -19,7 +19,7 @@ import click
 
 from ..schema.yaml_schema import SchemaType
 
-DB_SCHEMA = os.environ.get("DB_SCHEMA", "agent")
+DB_SCHEMA = os.environ.get("CONTEXTFORGE_DB_SCHEMA", "agent")
 
 
 def run_async(coro):
@@ -327,7 +327,7 @@ def sync_prompts(ctx, direction: str, name: Optional[str]):
             sync = create_langfuse_sync(store)
             
             if not sync.is_enabled:
-                click.echo("Langfuse sync is not configured. Set LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY.", err=True)
+                click.echo("Langfuse sync is not configured. Set CONTEXTFORGE_LANGFUSE_PUBLIC_KEY and CONTEXTFORGE_LANGFUSE_SECRET_KEY.", err=True)
                 return
             
             results = await sync.sync_all(session, direction=direction)

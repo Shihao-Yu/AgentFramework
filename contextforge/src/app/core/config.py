@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
+        env_prefix="CONTEXTFORGE_",
         case_sensitive=True,
     )
     
@@ -23,7 +24,7 @@ class Settings(BaseSettings):
     API_PREFIX: str = "/api"
     
     # Database
-    FRAMEWORK_DB_URL: str = "postgresql+asyncpg://user:password@localhost:5432/knowledge_db"
+    DB_URL: str = "postgresql+asyncpg://user:password@localhost:5432/knowledge_db"
     DB_POOL_SIZE: int = 10
     DB_MAX_OVERFLOW: int = 20
     DB_SCHEMA: str = "agent"
@@ -35,6 +36,12 @@ class Settings(BaseSettings):
     #   - Sentence Transformers (all-MiniLM-L6-v2): 384
     #   - Cohere embed-v3: 1024
     EMBEDDING_DIMENSION: int = 1536
+    EMBEDDING_MODEL: str = "text-embedding-3-small"
+    
+    # LLM Configuration  
+    LLM_MODEL: str = "gpt-4o-mini"
+    OPENAI_API_KEY: Optional[str] = None
+    OPENAI_BASE_URL: Optional[str] = None
     
     # Search Configuration
     SEARCH_BM25_WEIGHT: float = 0.4
@@ -86,6 +93,13 @@ class Settings(BaseSettings):
     RATE_LIMIT_DEFAULT_WINDOW: int = 60  # Window in seconds
     RATE_LIMIT_SEARCH_LIMIT: int = 200   # Higher limit for search endpoints
     RATE_LIMIT_WRITE_LIMIT: int = 50     # Lower limit for write operations
+    
+    # Authentication (JWKS)
+    AUTH_JWKS_URL: Optional[str] = None
+    AUTH_ISSUER: Optional[str] = None
+    AUTH_AUDIENCE: Optional[str] = None
+    AUTH_FALLBACK_JWKS_URL: Optional[str] = None
+    AUTH_FALLBACK_ISSUER: Optional[str] = None
     
     @property
     def cors_origins_list(self) -> list[str]:

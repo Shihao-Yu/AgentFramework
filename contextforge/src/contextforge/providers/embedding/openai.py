@@ -37,7 +37,7 @@ class OpenAIEmbeddingProvider:
     - text-embedding-ada-002 (1536 dimensions, legacy)
     
     Args:
-        api_key: OpenAI API key (default: from OPENAI_API_KEY env var)
+        api_key: OpenAI API key (default: from CONTEXTFORGE_OPENAI_API_KEY env var)
         model: Model name (default: text-embedding-3-small)
         dimensions: Override embedding dimensions (only for text-embedding-3-* models)
         batch_size: Maximum texts per batch request (default: 100)
@@ -71,11 +71,11 @@ class OpenAIEmbeddingProvider:
         batch_size: int = 100,
         timeout: float = 60.0,
     ):
-        self._api_key = api_key or os.environ.get("OPENAI_API_KEY")
+        self._api_key = api_key or os.environ.get("CONTEXTFORGE_OPENAI_API_KEY")
         if not self._api_key:
             raise ConfigurationError(
                 "OpenAI API key not provided. "
-                "Set OPENAI_API_KEY environment variable or pass api_key parameter."
+                "Set CONTEXTFORGE_OPENAI_API_KEY environment variable or pass api_key parameter."
             )
         
         self._model = model

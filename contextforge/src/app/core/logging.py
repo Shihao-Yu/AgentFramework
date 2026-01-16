@@ -17,10 +17,10 @@ def setup_logging(level: str | None = None) -> None:
     
     Args:
         level: Log level (DEBUG, INFO, WARNING, ERROR). 
-               Defaults to DEBUG if DEBUG=true in env, else INFO.
+               Defaults to DEBUG if CONTEXTFORGE_DEBUG=true in env, else INFO.
     """
     if level is None:
-        debug_mode = os.environ.get("DEBUG", "false").lower() == "true"
+        debug_mode = os.environ.get("CONTEXTFORGE_DEBUG", "false").lower() == "true"
         level = "DEBUG" if debug_mode else "INFO"
     
     logging.basicConfig(

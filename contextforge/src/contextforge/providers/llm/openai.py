@@ -38,7 +38,7 @@ class OpenAILLMProvider:
     - gpt-3.5-turbo
     
     Args:
-        api_key: OpenAI API key (default: from OPENAI_API_KEY env var)
+        api_key: OpenAI API key (default: from CONTEXTFORGE_OPENAI_API_KEY env var)
         model: Model name (default: gpt-4o-mini)
         timeout: Request timeout in seconds (default: 120)
     
@@ -64,11 +64,11 @@ class OpenAILLMProvider:
         model: str = "gpt-4o-mini",
         timeout: float = 120.0,
     ):
-        self._api_key = api_key or os.environ.get("OPENAI_API_KEY")
+        self._api_key = api_key or os.environ.get("CONTEXTFORGE_OPENAI_API_KEY")
         if not self._api_key:
             raise ConfigurationError(
                 "OpenAI API key not provided. "
-                "Set OPENAI_API_KEY environment variable or pass api_key parameter."
+                "Set CONTEXTFORGE_OPENAI_API_KEY environment variable or pass api_key parameter."
             )
         
         self._model = model

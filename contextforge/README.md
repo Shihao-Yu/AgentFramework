@@ -9,7 +9,7 @@ A comprehensive knowledge management system with hybrid search, knowledge graphs
 - **Question Variants**: Multiple phrasings for improved matching
 - **Staging Workflow**: Review queue for pipeline-generated content
 - **Analytics**: Usage tracking, hit statistics, and performance metrics
-- **Ticket Pipeline**: Automated conversion of support tickets to knowledge base entries
+
 
 ## Quick Start
 
@@ -87,8 +87,6 @@ backend/
 │   ├── models.py             # Pipeline data models
 │   ├── prompts.py            # LLM prompts
 │   └── service.py            # Pipeline orchestration
-├── jobs/                     # Background jobs
-│   └── ticket_pipeline_job.py
 ├── tests/                    # Test files
 ├── alembic.ini               # Alembic configuration
 ├── pyproject.toml            # Python project configuration
@@ -120,30 +118,6 @@ The hybrid search combines two methods:
 
 Default weights are 40% BM25 and 60% vector, configurable per request.
 
-## Pipeline
-
-The ticket-to-knowledge pipeline:
-
-1. **Filter**: Skip tickets that don't meet basic criteria
-2. **Analyze**: Use LLM to extract knowledge from ticket
-3. **Search**: Find similar existing knowledge items
-4. **Decide**: Based on similarity:
-   - ≥0.95: SKIP (near duplicate)
-   - ≥0.85: ADD_VARIANT (different phrasing)
-   - ≥0.70: LLM decides MERGE vs NEW
-   - <0.70: NEW
-5. **Execute**: Create staging item or add variant
-
-### Running the Pipeline
-
-```bash
-# With mock data
-python -m jobs.ticket_pipeline_job --mock --dry-run
-
-# Production run
-python -m jobs.ticket_pipeline_job --batch-size 100
-```
-
 ## Customization
 
 ### Embedding Client
@@ -174,22 +148,6 @@ def get_inference_client_instance() -> InferenceClient:
         api_key=settings.INFERENCE_API_KEY,
         model=settings.INFERENCE_MODEL,
     )
-```
-
-### Ticket Source
-
-Implement your ticket source by extending `TicketSource` in `jobs/ticket_pipeline_job.py`:
-
-```python
-class ClickHouseTicketSource(TicketSource):
-    async def fetch_tickets(
-        self,
-        limit: int = 100,
-        since: Optional[datetime] = None,
-        until: Optional[datetime] = None
-    ) -> List[TicketData]:
-        # Query your ClickHouse database
-        ...
 ```
 
 ## API Endpoints
@@ -245,14 +203,14 @@ pytest tests/ -v
 ### Code Formatting
 
 ```bash
-black app/ pipeline/ jobs/
-ruff check app/ pipeline/ jobs/
+black app/ pipeline/
+ruff check app/ pipeline/
 ```
 
 ### Type Checking
 
 ```bash
-mypy app/ pipeline/ jobs/
+mypy app/ pipeline/
 ```
 
 ## Environment Variables

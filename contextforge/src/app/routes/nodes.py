@@ -54,7 +54,8 @@ async def list_nodes(
     embedding_client: Optional[EmbeddingClient] = Depends(get_optional_embedding_client),
     current_user: dict = Depends(get_current_user),
 ):
-    user_tenant_ids = await get_user_tenant_ids(session, current_user.get("user_id", "anonymous"))
+    email = current_user["email"]
+    user_tenant_ids = await get_user_tenant_ids(session, email)
     
     params = NodeListParams(
         tenant_ids=tenant_ids,
@@ -84,7 +85,8 @@ async def search_nodes(
     embedding_client: EmbeddingClient = Depends(get_embedding_client),
     current_user: dict = Depends(get_current_user),
 ):
-    user_tenant_ids = await get_user_tenant_ids(session, current_user.get("user_id", "anonymous"))
+    email = current_user["email"]
+    user_tenant_ids = await get_user_tenant_ids(session, email)
     
     service = NodeService(session, embedding_client)
     results = await service.hybrid_search(
@@ -97,10 +99,7 @@ async def search_nodes(
         limit=limit,
     )
     
-    # Record hits for all returned results
     if results:
-        # TODO: get username from auth token
-        username = current_user.get("username", "default")
         hits = [
             HitRecord(
                 node_id=r.node.id,
@@ -110,7 +109,7 @@ async def search_nodes(
             for r in results
         ]
         metrics_service = MetricsService(session, user_tenant_ids)
-        await metrics_service.record_hits_batch(hits, query_text=q, username=username)
+        await metrics_service.record_hits_batch(hits, query_text=q, username=email)
     
     return NodeSearchResponse(
         results=results,
@@ -128,7 +127,8 @@ async def get_node(
     embedding_client: Optional[EmbeddingClient] = Depends(get_optional_embedding_client),
     current_user: dict = Depends(get_current_user),
 ):
-    user_tenant_ids = await get_user_tenant_ids(session, current_user.get("user_id", "anonymous"))
+    email = current_user["email"]
+    user_tenant_ids = await get_user_tenant_ids(session, email)
     
     service = NodeService(session, embedding_client)
     node = await service.get_node(node_id, user_tenant_ids)
@@ -160,11 +160,11 @@ async def create_node(
     embedding_client: EmbeddingClient = Depends(get_embedding_client),
     current_user: dict = Depends(get_current_user),
 ):
-    user_id = current_user.get("user_id", "anonymous")
-    user_tenant_ids = await get_user_tenant_ids(session, user_id)
+    email = current_user["email"]
+    user_tenant_ids = await get_user_tenant_ids(session, email)
     
     service = NodeService(session, embedding_client)
-    node = await service.create_node(data, user_tenant_ids, created_by=user_id)
+    node = await service.create_node(data, user_tenant_ids, created_by=email)
     
     if not node:
         raise HTTPException(
@@ -183,11 +183,11 @@ async def update_node(
     embedding_client: EmbeddingClient = Depends(get_embedding_client),
     current_user: dict = Depends(get_current_user),
 ):
-    user_id = current_user.get("user_id", "anonymous")
-    user_tenant_ids = await get_user_tenant_ids(session, user_id)
+    email = current_user["email"]
+    user_tenant_ids = await get_user_tenant_ids(session, email)
     
     service = NodeService(session, embedding_client)
-    node = await service.update_node(node_id, data, user_tenant_ids, updated_by=user_id)
+    node = await service.update_node(node_id, data, user_tenant_ids, updated_by=email)
     
     if not node:
         raise HTTPException(
@@ -205,11 +205,11 @@ async def delete_node(
     embedding_client: Optional[EmbeddingClient] = Depends(get_optional_embedding_client),
     current_user: dict = Depends(get_current_user),
 ):
-    user_id = current_user.get("user_id", "anonymous")
-    user_tenant_ids = await get_user_tenant_ids(session, user_id)
+    email = current_user["email"]
+    user_tenant_ids = await get_user_tenant_ids(session, email)
     
     service = NodeService(session, embedding_client)
-    success = await service.delete_node(node_id, user_tenant_ids, deleted_by=user_id)
+    success = await service.delete_node(node_id, user_tenant_ids, deleted_by=email)
     
     if not success:
         raise HTTPException(
@@ -228,7 +228,8 @@ async def list_node_versions(
     embedding_client: Optional[EmbeddingClient] = Depends(get_optional_embedding_client),
     current_user: dict = Depends(get_current_user),
 ):
-    user_tenant_ids = await get_user_tenant_ids(session, current_user.get("user_id", "anonymous"))
+    email = current_user["email"]
+    user_tenant_ids = await get_user_tenant_ids(session, email)
     
     service = NodeService(session, embedding_client)
     versions = await service.get_node_versions(node_id, user_tenant_ids, limit)

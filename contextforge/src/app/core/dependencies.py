@@ -4,12 +4,12 @@ Dependency injection for FastAPI.
 Provides access to services, clients, and authentication.
 """
 
-import os
 import logging
 from typing import Optional
 from fastapi import Depends, Header, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.database import get_session
 from app.clients.embedding_client import EmbeddingClient
 from app.clients.inference_client import InferenceClient
@@ -49,12 +49,12 @@ def _initialize_clients() -> None:
 
 
 def _create_embedding_client() -> EmbeddingClient:
-    openai_key = os.environ.get("OPENAI_API_KEY")
+    openai_key = settings.OPENAI_API_KEY
     if openai_key:
         try:
             from contextforge.providers.embedding import OpenAIEmbeddingProvider
             
-            model = os.environ.get("EMBEDDING_MODEL", "text-embedding-3-small")
+            model = settings.EMBEDDING_MODEL
             logger.info(f"Using OpenAI embedding provider with model {model}")
             
             return _OpenAIEmbeddingClientWrapper(
@@ -68,7 +68,7 @@ def _create_embedding_client() -> EmbeddingClient:
     try:
         from contextforge.providers.embedding import SentenceTransformersProvider
         
-        model = os.environ.get("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
+        model = settings.EMBEDDING_MODEL
         logger.info(f"Using SentenceTransformers embedding provider with model {model}")
         
         return _SentenceTransformersClientWrapper(
@@ -81,19 +81,19 @@ def _create_embedding_client() -> EmbeddingClient:
     
     raise EmbeddingClientNotConfiguredError(
         "No embedding provider available. "
-        "Set OPENAI_API_KEY or install sentence-transformers."
+        "Set CONTEXTFORGE_OPENAI_API_KEY or install sentence-transformers."
     )
 
 
 def _create_inference_client() -> InferenceClient:
-    openai_key = os.environ.get("OPENAI_API_KEY")
+    openai_key = settings.OPENAI_API_KEY
     if openai_key:
         try:
             from infra.inference import InferenceClient as InfraInferenceClient
             from infra.tracing import TracingClient, TracedInferenceClient
             
-            model = os.environ.get("LLM_MODEL", "gpt-4o-mini")
-            base_url = os.environ.get("OPENAI_BASE_URL")
+            model = settings.LLM_MODEL
+            base_url = settings.OPENAI_BASE_URL
             logger.info(f"Using infra InferenceClient with model {model}")
             
             inference = InfraInferenceClient(
@@ -114,7 +114,7 @@ def _create_inference_client() -> InferenceClient:
         try:
             from contextforge.providers.llm import OpenAILLMProvider
             
-            model = os.environ.get("LLM_MODEL", "gpt-4o-mini")
+            model = settings.LLM_MODEL
             logger.info(f"Using OpenAI LLM provider with model {model}")
             
             return _OpenAIInferenceClientWrapper(
@@ -126,7 +126,7 @@ def _create_inference_client() -> InferenceClient:
             logger.warning(f"Failed to initialize OpenAI LLM: {e}")
     
     raise InferenceClientNotConfiguredError(
-        "No LLM provider available. Set OPENAI_API_KEY."
+        "No LLM provider available. Set CONTEXTFORGE_OPENAI_API_KEY."
     )
 
 
@@ -322,13 +322,13 @@ def _get_jwks_auth_provider():
     """Lazy-initialize JWKS auth provider from environment."""
     global _jwks_auth_provider
     if _jwks_auth_provider is None:
-        jwks_url = os.environ.get("AUTH_JWKS_URL")
-        issuer = os.environ.get("AUTH_ISSUER")
-        audience = os.environ.get("AUTH_AUDIENCE")
+        jwks_url = settings.AUTH_JWKS_URL
+        issuer = settings.AUTH_ISSUER
+        audience = settings.AUTH_AUDIENCE
         
         if not jwks_url or not issuer:
             raise RuntimeError(
-                "AUTH_MODE=jwks requires AUTH_JWKS_URL and AUTH_ISSUER environment variables"
+                "JWKS auth requires CONTEXTFORGE_AUTH_JWKS_URL and CONTEXTFORGE_AUTH_ISSUER"
             )
         
         from contextforge.providers.auth import JWKSAuthProvider
@@ -337,8 +337,8 @@ def _get_jwks_auth_provider():
             jwks_url=jwks_url,
             issuer=issuer,
             audience=audience,
-            fallback_jwks_url=os.environ.get("AUTH_FALLBACK_JWKS_URL"),
-            fallback_issuer=os.environ.get("AUTH_FALLBACK_ISSUER"),
+            fallback_jwks_url=settings.AUTH_FALLBACK_JWKS_URL,
+            fallback_issuer=settings.AUTH_FALLBACK_ISSUER,
         )
     return _jwks_auth_provider
 
@@ -351,7 +351,7 @@ async def get_current_user(
     
     Validates JWT token via JWKS endpoint (Azure AD / ADFS).
     
-    Required environment variables:
+    Required environment variables (all prefixed with CONTEXTFORGE_):
     - AUTH_JWKS_URL: JWKS endpoint URL
     - AUTH_ISSUER: Expected token issuer
     - AUTH_AUDIENCE: Expected token audience (optional)

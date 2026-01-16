@@ -48,5 +48,5 @@ async def search_knowledge(
     return await service.hybrid_search(
         request,
         session_id=x_session_id,
-        user_id=user_id if user_id != "anonymous" else None
+        user_id=email if email != "anonymous@local" else None
     )

@@ -34,8 +34,8 @@ async def get_metrics_summary(
     session: AsyncSession = Depends(get_session),
     current_user: dict = Depends(get_current_user),
 ):
-    user_id = current_user.get("user_id", "anonymous")
-    user_tenant_ids = await get_user_tenant_ids(session, user_id)
+    email = current_user["email"]
+    user_tenant_ids = await get_user_tenant_ids(session, email)
     service = MetricsService(session, user_tenant_ids)
     return await service.get_summary(days, node_types=node_types)
 
@@ -47,8 +47,8 @@ async def get_top_items(
     session: AsyncSession = Depends(get_session),
     current_user: dict = Depends(get_current_user),
 ):
-    user_id = current_user.get("user_id", "anonymous")
-    user_tenant_ids = await get_user_tenant_ids(session, user_id)
+    email = current_user["email"]
+    user_tenant_ids = await get_user_tenant_ids(session, email)
     service = MetricsService(session, user_tenant_ids)
     return await service.get_top_items(limit, days)
 
@@ -59,8 +59,8 @@ async def get_daily_trend(
     session: AsyncSession = Depends(get_session),
     current_user: dict = Depends(get_current_user),
 ):
-    user_id = current_user.get("user_id", "anonymous")
-    user_tenant_ids = await get_user_tenant_ids(session, user_id)
+    email = current_user["email"]
+    user_tenant_ids = await get_user_tenant_ids(session, email)
     service = MetricsService(session, user_tenant_ids)
     return await service.get_daily_trend(days)
 
@@ -71,8 +71,8 @@ async def get_tag_stats(
     session: AsyncSession = Depends(get_session),
     current_user: dict = Depends(get_current_user),
 ):
-    user_id = current_user.get("user_id", "anonymous")
-    user_tenant_ids = await get_user_tenant_ids(session, user_id)
+    email = current_user["email"]
+    user_tenant_ids = await get_user_tenant_ids(session, email)
     service = MetricsService(session, user_tenant_ids)
     return await service.get_tag_stats(limit)
 
@@ -84,8 +84,8 @@ async def get_item_stats(
     session: AsyncSession = Depends(get_session),
     current_user: dict = Depends(get_current_user),
 ):
-    user_id = current_user.get("user_id", "anonymous")
-    user_tenant_ids = await get_user_tenant_ids(session, user_id)
+    email = current_user["email"]
+    user_tenant_ids = await get_user_tenant_ids(session, email)
     service = MetricsService(session, user_tenant_ids)
     stats = await service.get_node_stats(item_id, days)
     
@@ -119,8 +119,8 @@ async def get_heatmap(
     - **metric**: What to measure - hits (total) or sessions (unique)
     - **include_zero**: Whether to include never-accessed nodes
     """
-    user_id = current_user.get("user_id", "anonymous")
-    user_tenant_ids = await get_user_tenant_ids(session, user_id)
+    email = current_user["email"]
+    user_tenant_ids = await get_user_tenant_ids(session, email)
     service = MetricsService(session, user_tenant_ids)
     return await service.get_heatmap(period, metric, node_types, include_zero)
 
@@ -137,8 +137,8 @@ async def get_heatmap_by_tags(
     
     Shows which tags/topics are most frequently accessed.
     """
-    user_id = current_user.get("user_id", "anonymous")
-    user_tenant_ids = await get_user_tenant_ids(session, user_id)
+    email = current_user["email"]
+    user_tenant_ids = await get_user_tenant_ids(session, email)
     service = MetricsService(session, user_tenant_ids)
     return await service.get_heatmap_by_tags(period, limit)
 
@@ -154,7 +154,7 @@ async def get_heatmap_by_types(
     
     Shows which knowledge types (FAQ, Playbook, etc.) are most accessed.
     """
-    user_id = current_user.get("user_id", "anonymous")
-    user_tenant_ids = await get_user_tenant_ids(session, user_id)
+    email = current_user["email"]
+    user_tenant_ids = await get_user_tenant_ids(session, email)
     service = MetricsService(session, user_tenant_ids)
     return await service.get_heatmap_by_types(period)

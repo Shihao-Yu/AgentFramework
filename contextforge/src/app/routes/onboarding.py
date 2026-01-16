@@ -37,10 +37,9 @@ async def onboard_content(
 
     Returns the count and IDs of created staging nodes.
     """
-    user_id = current_user.get("user_id", "anonymous")
+    email = current_user["email"]
     user_tenants = current_user.get("tenant_ids", [])
 
-    # Validate tenant access
     if request.tenant_id not in user_tenants and user_tenants:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -52,5 +51,5 @@ async def onboard_content(
         items=request.items,
         tenant_id=request.tenant_id,
         source_tag=request.source_tag,
-        created_by=user_id,
+        created_by=email,
     )

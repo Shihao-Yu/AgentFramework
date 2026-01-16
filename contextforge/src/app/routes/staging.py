@@ -30,8 +30,8 @@ async def get_staging_counts(
     session: AsyncSession = Depends(get_session),
     current_user: dict = Depends(get_current_user),
 ):
-    user_id = current_user.get("user_id", "anonymous")
-    user_tenant_ids = await get_user_tenant_ids(session, user_id)
+    email = current_user["email"]
+    user_tenant_ids = await get_user_tenant_ids(session, email)
     
     service = StagingService(session, user_tenant_ids)
     counts = await service.get_counts()
@@ -48,8 +48,8 @@ async def list_staging_items(
     session: AsyncSession = Depends(get_session),
     current_user: dict = Depends(get_current_user),
 ):
-    user_id = current_user.get("user_id", "anonymous")
-    user_tenant_ids = await get_user_tenant_ids(session, user_id)
+    email = current_user["email"]
+    user_tenant_ids = await get_user_tenant_ids(session, email)
     
     service = StagingService(session, user_tenant_ids)
     items, total = await service.list_items(status, action, page, limit)
@@ -68,8 +68,8 @@ async def get_staging_item(
     session: AsyncSession = Depends(get_session),
     current_user: dict = Depends(get_current_user),
 ):
-    user_id = current_user.get("user_id", "anonymous")
-    user_tenant_ids = await get_user_tenant_ids(session, user_id)
+    email = current_user["email"]
+    user_tenant_ids = await get_user_tenant_ids(session, email)
     
     service = StagingService(session, user_tenant_ids)
     item = await service.get_item(item_id)
@@ -90,13 +90,13 @@ async def approve_staging_item(
     session: AsyncSession = Depends(get_session),
     current_user: dict = Depends(get_current_user),
 ):
-    user_id = current_user.get("user_id", "anonymous")
-    user_tenant_ids = await get_user_tenant_ids(session, user_id)
+    email = current_user["email"]
+    user_tenant_ids = await get_user_tenant_ids(session, email)
     
     service = StagingService(session, user_tenant_ids)
     edits = request.edits if request else None
     success, created_item_id, message = await service.approve_item(
-        item_id, edits, reviewed_by=user_id
+        item_id, edits, reviewed_by=email
     )
     
     if not success:
@@ -120,12 +120,12 @@ async def reject_staging_item(
     session: AsyncSession = Depends(get_session),
     current_user: dict = Depends(get_current_user),
 ):
-    user_id = current_user.get("user_id", "anonymous")
-    user_tenant_ids = await get_user_tenant_ids(session, user_id)
+    email = current_user["email"]
+    user_tenant_ids = await get_user_tenant_ids(session, email)
     
     service = StagingService(session, user_tenant_ids)
     reason = request.reason if request else None
-    success, message = await service.reject_item(item_id, reason, reviewed_by=user_id)
+    success, message = await service.reject_item(item_id, reason, reviewed_by=email)
     
     if not success:
         raise HTTPException(

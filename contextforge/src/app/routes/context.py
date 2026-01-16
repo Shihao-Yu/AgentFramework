@@ -55,7 +55,7 @@ async def get_context(
     - **stats**: Search and expansion statistics
     """
     email = current_user["email"]
-    user_tenant_ids = await get_user_tenant_ids(session, user_id)
+    user_tenant_ids = await get_user_tenant_ids(session, email)
     
     if not request.tenant_ids:
         request.tenant_ids = user_tenant_ids

@@ -213,7 +213,7 @@ def create_langfuse_sync(
     
     return LangfusePromptSync(
         store=store,
-        public_key=public_key or os.getenv("LANGFUSE_PUBLIC_KEY"),
-        secret_key=secret_key or os.getenv("LANGFUSE_SECRET_KEY"),
-        host=host or os.getenv("LANGFUSE_HOST"),
+        public_key=public_key or os.getenv("CONTEXTFORGE_LANGFUSE_PUBLIC_KEY"),
+        secret_key=secret_key or os.getenv("CONTEXTFORGE_LANGFUSE_SECRET_KEY"),
+        host=host or os.getenv("CONTEXTFORGE_LANGFUSE_HOST"),
     )
