@@ -17,10 +17,14 @@ import {
 import '@xyflow/react/dist/style.css'
 
 import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { KnowledgeNode, type KnowledgeNodeData } from './nodes/KnowledgeNode'
 import { CustomEdge, type CustomEdgeData } from './CustomEdge'
+import { HeatLegend } from './HeatLegend'
 import { getLayoutedElements, type LayoutDirection } from '@/lib/graph-layout'
-import type { GraphNode, GraphEdge } from '@/types/graph'
+import { useHeatmap, type HeatmapPeriod, type HeatmapNodeData } from '@/hooks/useHeatmap'
+import { getHeatBgColor } from '@/lib/heat-utils'
+import type { GraphNode, GraphEdge, GraphViewMode } from '@/types/graph'
 
 const nodeTypes = {
   knowledge: KnowledgeNode,
@@ -38,27 +42,41 @@ export interface GraphCanvasProps {
   onNodeDoubleClick?: (nodeId: number) => void
   onEdgeCreate?: (sourceId: number, targetId: number) => void
   className?: string
+  enableHeatmap?: boolean
 }
 
 function transformToReactFlowNodes(
   graphNodes: GraphNode[],
-  searchMatches: number[] = []
+  searchMatches: number[] = [],
+  viewMode: GraphViewMode = 'type',
+  heatmapData?: Map<number, HeatmapNodeData>
 ): Node<KnowledgeNodeData>[] {
   const searchMatchSet = new Set(searchMatches)
   
-  return graphNodes.map((node) => ({
-    id: String(node.id),
-    type: 'knowledge',
-    position: { x: node.x || 0, y: node.y || 0 },
-    data: {
-      id: node.id,
-      nodeType: node.node_type,
-      title: node.title,
-      summary: node.summary,
-      tags: node.tags,
-      isSearchMatch: searchMatchSet.has(node.id),
-    },
-  }))
+  return graphNodes.map((node) => {
+    const heatData = heatmapData?.get(node.id)
+    
+    return {
+      id: String(node.id),
+      type: 'knowledge',
+      position: { x: node.x || 0, y: node.y || 0 },
+      data: {
+        id: node.id,
+        nodeType: node.node_type,
+        title: node.title,
+        summary: node.summary,
+        tags: node.tags,
+        isSearchMatch: searchMatchSet.has(node.id),
+        viewMode,
+        heatData: heatData ? {
+          heatScore: heatData.heat_score,
+          totalHits: heatData.total_hits,
+          uniqueSessions: heatData.unique_sessions,
+          lastHitAt: heatData.last_hit_at ?? undefined,
+        } : undefined,
+      },
+    }
+  })
 }
 
 function transformToReactFlowEdges(graphEdges: GraphEdge[]): Edge<CustomEdgeData>[] {
@@ -87,12 +105,20 @@ export function GraphCanvasCore({
   onNodeDoubleClick,
   onEdgeCreate,
   className,
+  enableHeatmap = true,
 }: GraphCanvasProps) {
   const [layoutDirection, setLayoutDirection] = useState<LayoutDirection>('TB')
+  const [viewMode, setViewMode] = useState<GraphViewMode>('type')
+  const [heatPeriod, setHeatPeriod] = useState<HeatmapPeriod>('7d')
+  
+  const { heatmapData, stats, isLoading: isHeatmapLoading } = useHeatmap({
+    period: heatPeriod,
+    enabled: enableHeatmap && viewMode === 'heat',
+  })
 
   const initialNodes = useMemo(
-    () => transformToReactFlowNodes(graphNodes, searchMatches),
-    [graphNodes, searchMatches]
+    () => transformToReactFlowNodes(graphNodes, searchMatches, viewMode, viewMode === 'heat' ? heatmapData : undefined),
+    [graphNodes, searchMatches, viewMode, heatmapData]
   )
 
   const initialEdges = useMemo(
@@ -185,23 +211,75 @@ export function GraphCanvasCore({
           zoomable
           pannable
           className="!bg-background/80"
+          nodeColor={viewMode === 'heat' 
+            ? (node) => getHeatBgColor((node.data as KnowledgeNodeData).heatData?.heatScore)
+            : undefined
+          }
         />
-        <Panel position="top-right" className="flex gap-1">
-          <Button
-            variant={layoutDirection === 'TB' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => handleLayout('TB')}
-          >
-            Vertical
-          </Button>
-          <Button
-            variant={layoutDirection === 'LR' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => handleLayout('LR')}
-          >
-            Horizontal
-          </Button>
+        
+        <Panel position="top-right" className="flex flex-col gap-2">
+          <div className="flex gap-1">
+            <Button
+              variant={layoutDirection === 'TB' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => handleLayout('TB')}
+            >
+              Vertical
+            </Button>
+            <Button
+              variant={layoutDirection === 'LR' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => handleLayout('LR')}
+            >
+              Horizontal
+            </Button>
+          </div>
+          
+          {enableHeatmap && (
+            <div className="flex gap-1 items-center bg-background/80 rounded-md p-1">
+              <Button
+                variant={viewMode === 'type' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('type')}
+              >
+                Type
+              </Button>
+              <Button
+                variant={viewMode === 'heat' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('heat')}
+                disabled={isHeatmapLoading && viewMode !== 'heat'}
+              >
+                {isHeatmapLoading && viewMode === 'heat' ? 'Loading...' : 'Heat'}
+              </Button>
+              
+              {viewMode === 'heat' && (
+                <Select value={heatPeriod} onValueChange={(v) => setHeatPeriod(v as HeatmapPeriod)}>
+                  <SelectTrigger className="w-[80px] h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="7d">7 days</SelectItem>
+                    <SelectItem value="30d">30 days</SelectItem>
+                    <SelectItem value="90d">90 days</SelectItem>
+                    <SelectItem value="all">All time</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+          )}
         </Panel>
+        
+        {viewMode === 'heat' && (
+          <Panel position="bottom-left">
+            <HeatLegend compact />
+            {stats && (
+              <div className="mt-1 text-xs text-muted-foreground">
+                {stats.nodes_with_hits}/{stats.total_nodes} nodes with hits
+              </div>
+            )}
+          </Panel>
+        )}
       </ReactFlow>
     </div>
   )

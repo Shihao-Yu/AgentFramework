@@ -13,6 +13,9 @@ from app.schemas.metrics import (
     DailyTrendResponse,
     TagStatsResponse,
     ItemStatsResponse,
+    HeatmapResponse,
+    HeatmapTagsResponse,
+    HeatmapTypesResponse,
 )
 
 
@@ -93,3 +96,65 @@ async def get_item_stats(
         )
     
     return stats
+
+
+# ==================== Heatmap Endpoints ====================
+
+@router.get("/heatmap", response_model=HeatmapResponse)
+async def get_heatmap(
+    period: str = Query("7d", regex="^(7d|30d|90d|all)$", description="Time period"),
+    metric: str = Query("hits", regex="^(hits|sessions)$", description="Heat metric"),
+    node_types: List[str] = Query(None, description="Filter by node types"),
+    include_zero: bool = Query(True, description="Include nodes with 0 hits"),
+    session: AsyncSession = Depends(get_session),
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Get heatmap data for all knowledge nodes.
+    
+    Returns per-node heat scores (0-1) based on hit frequency.
+    Use this to visualize hot spots (frequently accessed) and cold spots.
+    
+    - **period**: Time window - 7d, 30d, 90d, or all
+    - **metric**: What to measure - hits (total) or sessions (unique)
+    - **include_zero**: Whether to include never-accessed nodes
+    """
+    user_id = current_user.get("user_id", "anonymous")
+    user_tenant_ids = await get_user_tenant_ids(session, user_id)
+    service = MetricsService(session, user_tenant_ids)
+    return await service.get_heatmap(period, metric, node_types, include_zero)
+
+
+@router.get("/heatmap/tags", response_model=HeatmapTagsResponse)
+async def get_heatmap_by_tags(
+    period: str = Query("7d", regex="^(7d|30d|90d|all)$", description="Time period"),
+    limit: int = Query(20, ge=1, le=100, description="Number of tags to return"),
+    session: AsyncSession = Depends(get_session),
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Get heatmap data aggregated by tags.
+    
+    Shows which tags/topics are most frequently accessed.
+    """
+    user_id = current_user.get("user_id", "anonymous")
+    user_tenant_ids = await get_user_tenant_ids(session, user_id)
+    service = MetricsService(session, user_tenant_ids)
+    return await service.get_heatmap_by_tags(period, limit)
+
+
+@router.get("/heatmap/types", response_model=HeatmapTypesResponse)
+async def get_heatmap_by_types(
+    period: str = Query("7d", regex="^(7d|30d|90d|all)$", description="Time period"),
+    session: AsyncSession = Depends(get_session),
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Get heatmap data aggregated by node type.
+    
+    Shows which knowledge types (FAQ, Playbook, etc.) are most accessed.
+    """
+    user_id = current_user.get("user_id", "anonymous")
+    user_tenant_ids = await get_user_tenant_ids(session, user_id)
+    service = MetricsService(session, user_tenant_ids)
+    return await service.get_heatmap_by_types(period)

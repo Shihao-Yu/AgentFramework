@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { apiRequest } from '@/lib/api'
 import type { FAQItem, FAQFormData } from '@/types/knowledge'
 
@@ -146,7 +146,8 @@ export function useFAQs(tenantId?: string) {
   useEffect(() => {
     fetchItems()
     fetchAllTags()
-  }, []) // Only run on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Update filters and refetch
   const updateFilters = useCallback((newFilters: Partial<FAQFilters>) => {

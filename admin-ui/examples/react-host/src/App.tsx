@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import '@anthropic/admin-ui-widget'
+import '@common/context-management-widget'
 
 interface AdminUIWidgetElement extends HTMLElement {
   navigate(path: string): void
@@ -8,6 +8,7 @@ interface AdminUIWidgetElement extends HTMLElement {
 }
 
 declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace JSX {
     interface IntrinsicElements {
       'admin-ui-widget': React.DetailedHTMLProps<

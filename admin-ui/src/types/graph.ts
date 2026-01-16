@@ -35,6 +35,19 @@ export const NodeTypeConfig: Record<NodeType, { icon: string; color: string; bgC
   [NodeType.CONCEPT]: { icon: '💡', color: '#f1c40f', bgColor: '#fef9e7' },
 }
 
+// ==================== Graph View Mode ====================
+
+export type GraphViewMode = 'type' | 'heat'
+
+// ==================== Heat Data for Nodes ====================
+
+export interface NodeHeatData {
+  heatScore: number       // 0-1 normalized score
+  totalHits: number       // Raw hit count
+  uniqueSessions: number  // Unique session count
+  lastHitAt?: string      // ISO timestamp of last hit
+}
+
 export const EdgeType = {
   RELATED: 'related',
   PARENT: 'parent',

@@ -1,15 +1,14 @@
 {
-  "name": "@anthropic/admin-ui-widget",
+  "name": "@common/context-management-widget",
   "version": "1.0.0",
   "type": "module",
-  "main": "./dist-wc/admin-ui-widget.umd.js",
+  "main": "./dist-wc/admin-ui-widget.es.js",
   "module": "./dist-wc/admin-ui-widget.es.js",
   "types": "./dist-wc/types/web-component.d.ts",
   "exports": {
     ".": {
       "types": "./dist-wc/types/web-component.d.ts",
-      "import": "./dist-wc/admin-ui-widget.es.js",
-      "require": "./dist-wc/admin-ui-widget.umd.js"
+      "import": "./dist-wc/admin-ui-widget.es.js"
     }
   },
   "files": [

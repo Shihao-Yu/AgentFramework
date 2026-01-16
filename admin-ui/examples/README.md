@@ -91,7 +91,7 @@ npm start
 
 **ESM (Modern bundlers):**
 ```javascript
-import '@anthropic/admin-ui-widget'
+import '@common/context-management-widget'
 ```
 
 ### Attributes

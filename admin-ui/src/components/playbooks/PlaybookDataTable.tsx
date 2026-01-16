@@ -229,7 +229,8 @@ export function PlaybookDataTable({
         },
       },
     ],
-    [domains, onView, onEdit, onDelete]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [domains, onView, onEdit, onDelete, getDomainName]
   )
 
   const table = useReactTable({

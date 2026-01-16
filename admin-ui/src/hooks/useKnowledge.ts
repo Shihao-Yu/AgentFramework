@@ -26,9 +26,7 @@ interface LegacyFAQFormData {
   status: string
 }
 
-interface FAQContent {
-  answer: string
-}
+
 
 interface DuplicateCheckResult {
   item: LegacyKnowledgeItem

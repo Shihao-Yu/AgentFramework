@@ -90,7 +90,6 @@ const DEFAULT_LIMIT = 100
 
 export function useNodes(initialFilters: NodeFilters = {}) {
   const [nodes, setNodes] = useState<KnowledgeNode[]>([])
-  const [total, setTotal] = useState(0)
   const [allTags, setAllTags] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -148,7 +147,6 @@ export function useNodes(initialFilters: NodeFilters = {}) {
       const response = await apiRequest<ApiNodeListResponse>('/api/nodes', { params })
       
       setNodes(response.data)
-      setTotal(response.total)
       setPagination({
         page: response.page,
         limit: response.limit,
@@ -197,10 +195,10 @@ export function useNodes(initialFilters: NodeFilters = {}) {
     }
   }, [filters.node_types, filters.tenant_ids])
 
-  // Initial fetch
   useEffect(() => {
     fetchNodes()
     fetchAllTags()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const getNode = useCallback(async (id: number): Promise<NodeDetailResponse | null> => {
@@ -336,9 +334,7 @@ export function useNodes(initialFilters: NodeFilters = {}) {
         method: 'DELETE',
       })
       
-      // Update local state
       setNodes(prev => prev.filter(node => node.id !== id))
-      setTotal(prev => prev - 1)
       setPagination(prev => ({ ...prev, total: prev.total - 1 }))
       
       return true

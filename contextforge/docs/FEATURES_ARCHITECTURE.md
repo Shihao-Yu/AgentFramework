@@ -380,6 +380,14 @@ Graph traversal and algorithms use NetworkX for performance, while PostgreSQL st
 - Python-native API
 - Separation of concerns (storage vs. computation)
 
+**Why not Neo4j?** Evaluated Neo4j but chose PostgreSQL + NetworkX because:
+- Primary workload is **hybrid search** (BM25 + vector), not graph traversal—Neo4j lacks native BM25/pgvector equivalents
+- Graph traversals are **shallow** (2-3 hops max for context expansion)—NetworkX handles this efficiently in-memory
+- Graph **fits in memory** and is cached in Redis—no need for a dedicated graph database
+- Avoids **operational complexity** of maintaining two databases and keeping them in sync
+
+Neo4j would make sense if we needed deep traversals (5+ hops), complex pattern matching (Cypher), or graph algorithms (PageRank, community detection) at scale.
+
 ### 3. Event-Driven Sync Between DB and Graph
 
 Changes to nodes/edges trigger graph updates to maintain consistency.

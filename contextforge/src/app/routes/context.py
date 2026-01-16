@@ -13,6 +13,7 @@ from app.core.dependencies import get_embedding_client, get_current_user
 from app.clients.embedding_client import EmbeddingClient
 from app.services.context_service import ContextService
 from app.services.tenant_service import TenantService
+from app.services.metrics_service import MetricsService, HitRecord
 from app.schemas.context import ContextRequest, ContextResponse
 
 
@@ -67,4 +68,27 @@ async def get_context(
         request.tenant_ids = allowed_tenants
     
     service = ContextService(session, embedding_client)
-    return await service.get_context(request)
+    response = await service.get_context(request)
+    
+    # Record hits for entry points and context nodes
+    all_hits = []
+    for ep in response.entry_points:
+        all_hits.append(HitRecord(
+            node_id=ep.id,
+            similarity_score=ep.score,
+            retrieval_method=ep.match_source or "hybrid",
+        ))
+    for cn in response.context:
+        all_hits.append(HitRecord(
+            node_id=cn.id,
+            similarity_score=cn.score,
+            retrieval_method="graph_expansion",
+        ))
+    
+    if all_hits:
+        # TODO: get username from auth token
+        username = "default"
+        metrics_service = MetricsService(session, user_tenant_ids)
+        await metrics_service.record_hits_batch(all_hits, query_text=request.query, username=username)
+    
+    return response

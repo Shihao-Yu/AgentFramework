@@ -368,6 +368,7 @@ export function useGraph() {
     }
   }, [])
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const getStats = useCallback(async (_tenantIds?: string[]): Promise<GraphStatsResponse> => {
     try {
       const response = await apiRequest<ApiGraphStatsResponse>('/api/graph/stats')

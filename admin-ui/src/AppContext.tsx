@@ -75,19 +75,12 @@ export function AppConfigProvider({ config, children }: AppConfigProviderProps) 
   )
 }
 
-/**
- * Hook to access the app configuration.
- * Use this to get API base URL, tenant ID, and other config values.
- */
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAppConfig(): AppConfig {
   return useContext(AppConfigContext)
 }
 
-/**
- * Hook to get the portal container for Radix UI components.
- * Returns the shadow root's host container when in web component mode,
- * or document.body for standalone mode.
- */
+// eslint-disable-next-line react-refresh/only-export-components
 export function usePortalContainer(): HTMLElement {
   const { shadowRoot } = useAppConfig()
   
@@ -109,10 +102,7 @@ export function usePortalContainer(): HTMLElement {
   return document.body
 }
 
-/**
- * Hook to emit custom events to the host application.
- * Events bubble up and cross the shadow DOM boundary.
- */
+// eslint-disable-next-line react-refresh/only-export-components
 export function useEmitEvent() {
   const { hostElement, isWebComponent } = useAppConfig()
   
@@ -132,13 +122,14 @@ export function useEmitEvent() {
   }
 }
 
-// Global config for use outside React (e.g., in API client)
 let globalConfig: AppConfig = defaultConfig
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function setGlobalConfig(config: Partial<AppConfig>) {
   globalConfig = { ...defaultConfig, ...config }
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function getGlobalConfig(): AppConfig {
   return globalConfig
 }

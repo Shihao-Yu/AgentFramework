@@ -162,6 +162,7 @@ export function usePlaybooks(tenantId?: string) {
   useEffect(() => {
     fetchItems()
     fetchAllTags()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Update filters and refetch

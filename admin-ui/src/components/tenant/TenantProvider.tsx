@@ -47,6 +47,7 @@ export function TenantProvider({ children, defaultTenantId }: TenantProviderProp
 
   useEffect(() => {
     if (!currentTenantId && selectedTenantIds.length > 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCurrentTenantId(selectedTenantIds[0])
     }
   }, [currentTenantId, selectedTenantIds])
@@ -57,6 +58,7 @@ export function TenantProvider({ children, defaultTenantId }: TenantProviderProp
         selectTenant(defaultTenantId)
       }
       if (!currentTenantId) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setCurrentTenantId(defaultTenantId)
       }
     }
@@ -99,6 +101,7 @@ export function TenantProvider({ children, defaultTenantId }: TenantProviderProp
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useTenantContext(): TenantContextValue {
   const context = useContext(TenantContext)
   if (!context) {

@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      '@anthropic/admin-ui-widget': path.resolve(__dirname, '../../dist-wc/admin-ui-widget.es.js'),
+      '@common/context-management-widget': path.resolve(__dirname, '../../dist-wc/admin-ui-widget.es.js'),
     },
   },
   server: {

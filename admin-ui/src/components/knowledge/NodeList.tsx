@@ -28,17 +28,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+
 import { MultiSelect } from '@/components/ui/multi-select'
 
 import type { KnowledgeNode, NodeType } from '@/types/graph'
-import { NodeTypeLabels, NodeTypeConfig, NodeStatus as NodeStatusEnum } from '@/types/graph'
+import { NodeTypeLabels, NodeTypeConfig } from '@/types/graph'
 
 interface PaginationInfo {
   page: number

@@ -17,7 +17,7 @@ export default defineConfig({
     lib: {
       entry: path.resolve(__dirname, 'src/web-component.tsx'),
       name: 'AdminUIWidget',
-      formats: ['es', 'umd'],
+      formats: ['es'],
       fileName: (format) => `admin-ui-widget.${format}.js`,
     },
     rollupOptions: {

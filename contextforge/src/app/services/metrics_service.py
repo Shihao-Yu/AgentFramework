@@ -2,6 +2,7 @@
 Metrics and analytics service.
 """
 
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import List, Optional
 from sqlmodel import select, func
@@ -20,7 +21,22 @@ from app.schemas.metrics import (
     TagStats,
     TagStatsResponse,
     ItemStatsResponse,
+    HeatmapNodeData,
+    HeatmapStats,
+    HeatmapResponse,
+    HeatmapTagData,
+    HeatmapTagsResponse,
+    HeatmapTypeData,
+    HeatmapTypesResponse,
 )
+
+
+@dataclass
+class HitRecord:
+    """Data for a single hit to record."""
+    node_id: int
+    similarity_score: Optional[float] = None
+    retrieval_method: Optional[str] = None  # 'bm25', 'vector', 'hybrid'
 
 
 class MetricsService:
@@ -305,3 +321,280 @@ class MetricsService:
             queries=queries,
             hit_trend=hit_trend,
         )
+
+    async def record_hits_batch(
+        self,
+        hits: List[HitRecord],
+        query_text: str,
+        username: Optional[str] = None,
+    ) -> int:
+        """
+        Record hits for all top-K search results (batch insert).
+        
+        Args:
+            hits: List of HitRecord with node_id, similarity_score, retrieval_method
+            query_text: The search query that produced these results
+            username: User who performed the search (from auth token)
+            
+        Returns:
+            Number of hits recorded
+        """
+        if not hits:
+            return 0
+        
+        # TODO: get username from auth token
+        username = username or "default"
+        
+        # Build batch insert values
+        values = []
+        params = {"query_text": query_text, "username": username}
+        
+        for i, hit in enumerate(hits):
+            values.append(f"""(
+                :node_id_{i}, 
+                :query_text, 
+                :score_{i}, 
+                :method_{i}, 
+                :username
+            )""")
+            params[f"node_id_{i}"] = hit.node_id
+            params[f"score_{i}"] = hit.similarity_score
+            params[f"method_{i}"] = hit.retrieval_method
+        
+        values_str = ", ".join(values)
+        
+        stmt = text(schema_sql(f"""
+            INSERT INTO {{schema}}.knowledge_hits 
+            (node_id, query_text, similarity_score, retrieval_method, user_id)
+            VALUES {values_str}
+        """))
+        
+        await self.session.execute(stmt, params)
+        await self.session.commit()
+        
+        return len(hits)
+
+    async def get_heatmap(
+        self,
+        period: str = "7d",
+        metric: str = "hits",
+        node_types: Optional[List[str]] = None,
+        include_zero: bool = True,
+    ) -> HeatmapResponse:
+        """
+        Get heatmap data for all nodes.
+        
+        Args:
+            period: Time period - '7d', '30d', '90d', 'all'
+            metric: Heat metric - 'hits' or 'sessions'
+            node_types: Optional filter by node types
+            include_zero: Include nodes with 0 hits
+            
+        Returns:
+            HeatmapResponse with per-node heat scores
+        """
+        # Calculate start date based on period
+        days_map = {"7d": 7, "30d": 30, "90d": 90, "all": None}
+        days = days_map.get(period)
+        
+        date_filter = ""
+        if days:
+            date_filter = "AND h.hit_at >= NOW() - INTERVAL ':days days'"
+        
+        node_type_filter = ""
+        if node_types:
+            node_type_list = ", ".join(f"'{nt}'" for nt in node_types)
+            node_type_filter = f"AND n.node_type IN ({node_type_list})"
+        
+        # Query with PERCENT_RANK for heat score
+        stmt = text(schema_sql(f"""
+            WITH period_hits AS (
+                SELECT 
+                    node_id,
+                    COUNT(*) as total_hits,
+                    COUNT(DISTINCT session_id) as unique_sessions,
+                    AVG(similarity_score) as avg_similarity,
+                    MAX(hit_at) as last_hit_at
+                FROM {{schema}}.knowledge_hits h
+                WHERE 1=1 {date_filter.replace(':days', str(days) if days else '0')}
+                GROUP BY node_id
+            ),
+            all_nodes AS (
+                SELECT 
+                    n.id as node_id,
+                    COALESCE(h.total_hits, 0) as total_hits,
+                    COALESCE(h.unique_sessions, 0) as unique_sessions,
+                    h.avg_similarity,
+                    h.last_hit_at
+                FROM {{schema}}.knowledge_nodes n
+                LEFT JOIN period_hits h ON n.id = h.node_id
+                WHERE n.is_deleted = FALSE 
+                  AND n.status = 'published'
+                  AND n.tenant_id = ANY(:tenant_ids)
+                  {node_type_filter}
+            )
+            SELECT 
+                node_id as id,
+                total_hits,
+                unique_sessions,
+                avg_similarity,
+                last_hit_at,
+                PERCENT_RANK() OVER (ORDER BY {'total_hits' if metric == 'hits' else 'unique_sessions'}) as heat_score
+            FROM all_nodes
+            {'WHERE total_hits > 0' if not include_zero else ''}
+            ORDER BY total_hits DESC
+        """))
+        
+        result = await self.session.execute(stmt, {"tenant_ids": self.user_tenant_ids})
+        rows = result.fetchall()
+        
+        nodes = []
+        total_hits = 0
+        max_hits = 0
+        min_hits = float('inf') if rows else 0
+        nodes_with_hits = 0
+        
+        for row in rows:
+            nodes.append(HeatmapNodeData(
+                id=row.id,
+                total_hits=row.total_hits,
+                unique_sessions=row.unique_sessions,
+                avg_similarity=float(row.avg_similarity) if row.avg_similarity else None,
+                last_hit_at=row.last_hit_at,
+                heat_score=float(row.heat_score),
+            ))
+            total_hits += row.total_hits
+            if row.total_hits > max_hits:
+                max_hits = row.total_hits
+            if row.total_hits < min_hits:
+                min_hits = row.total_hits
+            if row.total_hits > 0:
+                nodes_with_hits += 1
+        
+        if not rows:
+            min_hits = 0
+        
+        stats = HeatmapStats(
+            total_nodes=len(nodes),
+            nodes_with_hits=nodes_with_hits,
+            total_hits=total_hits,
+            max_hits=max_hits,
+            min_hits=int(min_hits),
+        )
+        
+        return HeatmapResponse(
+            period=period,
+            metric=metric,
+            generated_at=datetime.utcnow(),
+            stats=stats,
+            nodes=nodes,
+        )
+
+    async def get_heatmap_by_tags(
+        self,
+        period: str = "7d",
+        limit: int = 20,
+    ) -> HeatmapTagsResponse:
+        """Get heatmap data aggregated by tags."""
+        days_map = {"7d": 7, "30d": 30, "90d": 90, "all": None}
+        days = days_map.get(period)
+        
+        date_filter = ""
+        if days:
+            date_filter = f"AND h.hit_at >= NOW() - INTERVAL '{days} days'"
+        
+        stmt = text(schema_sql(f"""
+            WITH tag_hits AS (
+                SELECT 
+                    unnest(n.tags) as tag,
+                    COUNT(DISTINCT n.id) as node_count,
+                    COALESCE(SUM(stats.total_hits), 0) as total_hits
+                FROM {{schema}}.knowledge_nodes n
+                LEFT JOIN (
+                    SELECT node_id, COUNT(*) as total_hits
+                    FROM {{schema}}.knowledge_hits h
+                    WHERE 1=1 {date_filter}
+                    GROUP BY node_id
+                ) stats ON n.id = stats.node_id
+                WHERE n.is_deleted = FALSE
+                  AND n.status = 'published'
+                  AND n.tenant_id = ANY(:tenant_ids)
+                GROUP BY tag
+            )
+            SELECT 
+                tag,
+                node_count,
+                total_hits,
+                PERCENT_RANK() OVER (ORDER BY total_hits) as heat_score
+            FROM tag_hits
+            ORDER BY total_hits DESC
+            LIMIT :limit
+        """))
+        
+        result = await self.session.execute(stmt, {
+            "tenant_ids": self.user_tenant_ids,
+            "limit": limit,
+        })
+        
+        tags = []
+        for row in result.fetchall():
+            tags.append(HeatmapTagData(
+                tag=row.tag,
+                node_count=row.node_count,
+                total_hits=row.total_hits,
+                heat_score=float(row.heat_score),
+            ))
+        
+        return HeatmapTagsResponse(period=period, tags=tags)
+
+    async def get_heatmap_by_types(
+        self,
+        period: str = "7d",
+    ) -> HeatmapTypesResponse:
+        """Get heatmap data aggregated by node type."""
+        days_map = {"7d": 7, "30d": 30, "90d": 90, "all": None}
+        days = days_map.get(period)
+        
+        date_filter = ""
+        if days:
+            date_filter = f"AND h.hit_at >= NOW() - INTERVAL '{days} days'"
+        
+        stmt = text(schema_sql(f"""
+            WITH type_hits AS (
+                SELECT 
+                    n.node_type,
+                    COUNT(DISTINCT n.id) as node_count,
+                    COALESCE(SUM(stats.total_hits), 0) as total_hits
+                FROM {{schema}}.knowledge_nodes n
+                LEFT JOIN (
+                    SELECT node_id, COUNT(*) as total_hits
+                    FROM {{schema}}.knowledge_hits h
+                    WHERE 1=1 {date_filter}
+                    GROUP BY node_id
+                ) stats ON n.id = stats.node_id
+                WHERE n.is_deleted = FALSE
+                  AND n.status = 'published'
+                  AND n.tenant_id = ANY(:tenant_ids)
+                GROUP BY n.node_type
+            )
+            SELECT 
+                node_type,
+                node_count,
+                total_hits,
+                PERCENT_RANK() OVER (ORDER BY total_hits) as heat_score
+            FROM type_hits
+            ORDER BY total_hits DESC
+        """))
+        
+        result = await self.session.execute(stmt, {"tenant_ids": self.user_tenant_ids})
+        
+        types = []
+        for row in result.fetchall():
+            types.append(HeatmapTypeData(
+                node_type=row.node_type,
+                node_count=row.node_count,
+                total_hits=row.total_hits,
+                heat_score=float(row.heat_score),
+            ))
+        
+        return HeatmapTypesResponse(period=period, types=types)

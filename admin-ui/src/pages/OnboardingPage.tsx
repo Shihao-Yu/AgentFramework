@@ -104,6 +104,7 @@ export function OnboardingPage() {
       setContentBoxes([{ id: generateId(), text: '', nodeTypes: ['FAQ'] }])
       setSourceTag('')
     } catch {
+      // Error handled by useOnboarding hook
     }
   }, [contentBoxes, sourceTag, currentTenantId, onboard])
 

@@ -69,9 +69,9 @@ function PermissionPreview({ content }: { content: PermissionContent }) {
 
 function GenericPreview({ content }: { content: Record<string, unknown> }) {
   const preview = Object.entries(content)
-    .filter(([_, v]) => typeof v === 'string')
+    .filter(([, v]) => typeof v === 'string')
     .slice(0, 1)
-    .map(([_, v]) => String(v).slice(0, 150))
+    .map(([, v]) => String(v).slice(0, 150))
     .join(' ')
   
   return (
@@ -86,16 +86,17 @@ export function StagingContentPreview({ item }: StagingContentPreviewProps) {
 
   switch (item.node_type) {
     case 'faq':
-      return <FAQPreview content={content as FAQContent} />
+      return <FAQPreview content={content as unknown as FAQContent} />
     case 'playbook':
-      return <PlaybookPreview content={content as PlaybookContent} />
+      return <PlaybookPreview content={content as unknown as PlaybookContent} />
     case 'permission_rule':
-      return <PermissionPreview content={content as PermissionContent} />
+      return <PermissionPreview content={content as unknown as PermissionContent} />
     default:
       return <GenericPreview content={content} />
   }
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function getNodeTypeLabel(nodeType: string): string {
   const labels: Record<string, string> = {
     faq: 'FAQ',
@@ -110,6 +111,7 @@ export function getNodeTypeLabel(nodeType: string): string {
   return labels[nodeType] || nodeType
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function getNodeTypeBadgeColor(nodeType: string): string {
   const colors: Record<string, string> = {
     faq: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',

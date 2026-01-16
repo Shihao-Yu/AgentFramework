@@ -50,6 +50,7 @@ export function GraphExplorerPage() {
 
   useEffect(() => {
     if (!hasLoaded && selectedTenantIds.length > 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       loadAllNodes()
     }
   }, [hasLoaded, selectedTenantIds, loadAllNodes])

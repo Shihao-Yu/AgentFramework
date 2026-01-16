@@ -150,6 +150,7 @@ export function usePermissions(tenantId?: string) {
   useEffect(() => {
     fetchItems()
     fetchAllTags()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Update filters and refetch

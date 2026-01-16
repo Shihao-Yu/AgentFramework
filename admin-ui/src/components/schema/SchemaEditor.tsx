@@ -25,9 +25,9 @@ export function SchemaEditor({
   const [markers, setMarkers] = useState<editor.IMarkerData[]>([])
   const [isValidating, setIsValidating] = useState(false)
 
-  // Debounced validation
   useEffect(() => {
     if (!value) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setValidationErrors([])
       setMarkers([])
       return

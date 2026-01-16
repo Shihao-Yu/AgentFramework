@@ -22,6 +22,7 @@ declare global {
     'admin-ui-widget': AdminUIWidgetElement
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
   interface HTMLElementEventMap extends AdminUIEventMap {}
 
   namespace JSX {

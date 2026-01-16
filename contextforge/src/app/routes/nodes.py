@@ -12,6 +12,7 @@ from app.clients.embedding_client import EmbeddingClient
 from app.services.node_service import NodeService
 from app.services.edge_service import EdgeService
 from app.services.tenant_service import TenantService
+from app.services.metrics_service import MetricsService, HitRecord
 from app.schemas.nodes import (
     NodeListParams,
     NodeCreate,
@@ -95,6 +96,21 @@ async def search_nodes(
         vector_weight=vector_weight,
         limit=limit,
     )
+    
+    # Record hits for all returned results
+    if results:
+        # TODO: get username from auth token
+        username = current_user.get("username", "default")
+        hits = [
+            HitRecord(
+                node_id=r.node.id,
+                similarity_score=r.rrf_score,
+                retrieval_method="hybrid",
+            )
+            for r in results
+        ]
+        metrics_service = MetricsService(session, user_tenant_ids)
+        await metrics_service.record_hits_batch(hits, query_text=q, username=username)
     
     return NodeSearchResponse(
         results=results,

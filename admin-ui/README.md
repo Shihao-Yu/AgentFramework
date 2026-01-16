@@ -35,7 +35,7 @@ The Admin UI can be embedded in Angular, React, or any web application as a cust
 ### Installation
 
 ```bash
-npm install @anthropic/admin-ui-widget
+npm install @common/context-management-widget
 ```
 
 ### Basic Usage
@@ -109,7 +109,7 @@ export class AdminComponent {
 ### React Usage
 
 ```tsx
-import '@anthropic/admin-ui-widget';
+import '@common/context-management-widget';
 import { useEffect, useRef } from 'react';
 
 function AdminPage() {

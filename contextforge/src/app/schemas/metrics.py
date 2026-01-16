@@ -102,3 +102,68 @@ class ItemStatsResponse(BaseModel):
     avg_similarity: Optional[float] = None
     queries: List[str]  # Recent queries that hit this item
     hit_trend: List[DailyHitStats]  # Daily hits for this item
+
+
+# ==================== Heatmap ====================
+
+class HeatmapNodeData(BaseModel):
+    """Heat data for a single node."""
+    
+    id: int
+    total_hits: int
+    unique_sessions: int
+    avg_similarity: Optional[float] = None
+    last_hit_at: Optional[datetime] = None
+    heat_score: float  # 0-1 normalized score
+
+
+class HeatmapStats(BaseModel):
+    """Summary statistics for heatmap."""
+    
+    total_nodes: int
+    nodes_with_hits: int
+    total_hits: int
+    max_hits: int
+    min_hits: int
+
+
+class HeatmapResponse(BaseModel):
+    """Response for heatmap data."""
+    
+    period: str  # '7d', '30d', '90d', 'all'
+    metric: str  # 'hits' or 'sessions'
+    generated_at: datetime
+    stats: HeatmapStats
+    nodes: List[HeatmapNodeData]
+
+
+class HeatmapTagData(BaseModel):
+    """Heat data aggregated by tag."""
+    
+    tag: str
+    node_count: int
+    total_hits: int
+    heat_score: float
+
+
+class HeatmapTagsResponse(BaseModel):
+    """Response for tag-level heatmap."""
+    
+    period: str
+    tags: List[HeatmapTagData]
+
+
+class HeatmapTypeData(BaseModel):
+    """Heat data aggregated by node type."""
+    
+    node_type: str
+    node_count: int
+    total_hits: int
+    heat_score: float
+
+
+class HeatmapTypesResponse(BaseModel):
+    """Response for type-level heatmap."""
+    
+    period: str
+    types: List[HeatmapTypeData]

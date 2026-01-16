@@ -1,7 +1,8 @@
 import { memo } from 'react'
 import { Handle, Position, type NodeProps, type Node } from '@xyflow/react'
 import { cn } from '@/lib/utils'
-import { NodeTypeConfig, type NodeType } from '@/types/graph'
+import { NodeTypeConfig, type NodeType, type NodeHeatData } from '@/types/graph'
+import { getHeatColors, getHeatLevel, formatHitsCount } from '@/lib/heat-utils'
 
 export interface KnowledgeNodeData extends Record<string, unknown> {
   id: number
@@ -10,6 +11,8 @@ export interface KnowledgeNodeData extends Record<string, unknown> {
   summary?: string
   tags: string[]
   isSearchMatch?: boolean
+  viewMode?: 'type' | 'heat'
+  heatData?: NodeHeatData
 }
 
 export type KnowledgeNodeType = Node<KnowledgeNodeData, 'knowledge'>
@@ -23,6 +26,16 @@ const handleClassName = cn(
 function KnowledgeNodeComponent({ data, selected }: NodeProps<KnowledgeNodeType>) {
   const nodeData = data as KnowledgeNodeData
   const config = NodeTypeConfig[nodeData.nodeType]
+  
+  const isHeatMode = nodeData.viewMode === 'heat'
+  const heatScore = nodeData.heatData?.heatScore
+  const heatLevel = isHeatMode ? getHeatLevel(heatScore) : null
+  const heatColors = isHeatMode ? getHeatColors(heatScore) : null
+  const isNeverAccessed = heatLevel === 'never'
+
+  const bgColor = isHeatMode ? heatColors!.bg : config.bgColor
+  const borderColor = isHeatMode ? heatColors!.border : config.color
+  const textColor = isHeatMode ? heatColors!.text : config.color
 
   return (
     <>
@@ -35,11 +48,16 @@ function KnowledgeNodeComponent({ data, selected }: NodeProps<KnowledgeNodeType>
         className={cn(
           'min-w-[180px] max-w-[220px] rounded-lg border-2 px-3 py-2 shadow-md transition-all',
           selected && 'ring-2 ring-primary ring-offset-2',
-          nodeData.isSearchMatch && 'ring-2 ring-yellow-400'
+          nodeData.isSearchMatch && 'ring-2 ring-yellow-400',
+          isNeverAccessed && 'opacity-50'
         )}
         style={{
-          backgroundColor: config.bgColor,
-          borderColor: config.color,
+          backgroundColor: bgColor,
+          borderColor: borderColor,
+          borderStyle: isNeverAccessed ? 'dashed' : 'solid',
+          boxShadow: (heatLevel === 'hot' || heatLevel === 'fire') 
+            ? `0 0 12px ${borderColor}` 
+            : undefined,
         }}
       >
         <div className="flex items-center gap-2">
@@ -48,16 +66,26 @@ function KnowledgeNodeComponent({ data, selected }: NodeProps<KnowledgeNodeType>
           </span>
           <span
             className="flex-1 truncate text-sm font-medium"
-            style={{ color: config.color }}
+            style={{ color: textColor }}
           >
             {nodeData.title}
           </span>
         </div>
-        {nodeData.summary && (
+        
+        {isHeatMode && nodeData.heatData && (
+          <div className="mt-1 flex items-center gap-2 text-[10px]" style={{ color: textColor }}>
+            <span>{formatHitsCount(nodeData.heatData.totalHits)} hits</span>
+            <span className="opacity-60">|</span>
+            <span>{Math.round((heatScore ?? 0) * 100)}%</span>
+          </div>
+        )}
+        
+        {!isHeatMode && nodeData.summary && (
           <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
             {nodeData.summary}
           </p>
         )}
+        
         {nodeData.tags.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1">
             {nodeData.tags.slice(0, 2).map((tag: string) => (
