@@ -248,28 +248,11 @@ async def get_rate_limiter() -> InMemoryRateLimiter:
     return _rate_limiter
 
 
-def get_rate_limit_key(request: Request, user_context: Optional[dict] = None) -> str:
-    """
-    Generate rate limit key from request.
-    
-    Priority:
-    1. Authenticated user_id
-    2. X-Forwarded-For header (behind proxy)
-    3. Client IP
-    """
-    if user_context and user_context.get("is_authenticated"):
-        return f"user:{user_context['user_id']}"
-    
-    # Check for forwarded IP (behind proxy/load balancer)
+def get_rate_limit_key(request: Request) -> str:
     forwarded = request.headers.get("X-Forwarded-For")
     if forwarded:
-        # Take first IP (original client)
-        client_ip = forwarded.split(",")[0].strip()
-        return f"ip:{client_ip}"
-    
-    # Direct client IP
-    client_ip = request.client.host if request.client else "unknown"
-    return f"ip:{client_ip}"
+        return f"ip:{forwarded.split(',')[0].strip()}"
+    return f"ip:{request.client.host if request.client else 'unknown'}"
 
 
 def rate_limit_dependency(
@@ -305,13 +288,7 @@ def rate_limit_dependency(
         
         limiter = await get_rate_limiter()
         
-        # Generate key
-        if key_func:
-            key = key_func(request)
-        else:
-            # Get user context if available
-            user_context = getattr(request.state, 'user', None)
-            key = get_rate_limit_key(request, user_context)
+        key = key_func(request) if key_func else get_rate_limit_key(request)
         
         # Check rate limit
         info = await limiter.is_allowed(key, limit, window)
