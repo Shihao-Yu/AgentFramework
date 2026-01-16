@@ -19,7 +19,7 @@ export type AdminUIEventMap = {
 
 declare global {
   interface HTMLElementTagNameMap {
-    'admin-ui-widget': AdminUIWidgetElement
+    'context-management-widget': AdminUIWidgetElement
   }
 
   // eslint-disable-next-line @typescript-eslint/no-empty-object-type
@@ -27,7 +27,7 @@ declare global {
 
   namespace JSX {
     interface IntrinsicElements {
-      'admin-ui-widget': React.DetailedHTMLProps<
+      'context-management-widget': React.DetailedHTMLProps<
         React.HTMLAttributes<AdminUIWidgetElement> & AdminUIWidgetAttributes,
         AdminUIWidgetElement
       >

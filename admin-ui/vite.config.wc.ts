@@ -18,11 +18,11 @@ export default defineConfig({
       entry: path.resolve(__dirname, 'src/web-component.tsx'),
       name: 'AdminUIWidget',
       formats: ['es'],
-      fileName: (format) => `admin-ui-widget.${format}.js`,
+      fileName: (format) => `context-management-widget.${format}.js`,
     },
     rollupOptions: {
       output: {
-        assetFileNames: 'admin-ui-widget.[ext]',
+        assetFileNames: 'context-management-widget.[ext]',
         globals: {},
         inlineDynamicImports: false,
         manualChunks: undefined,

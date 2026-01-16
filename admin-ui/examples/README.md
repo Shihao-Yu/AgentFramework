@@ -1,6 +1,6 @@
 # Admin UI Widget - Examples
 
-This directory contains example applications demonstrating how to use the `<admin-ui-widget>` web component in different frameworks.
+This directory contains example applications demonstrating how to use the `<context-management-widget>` web component in different frameworks.
 
 ## Prerequisites
 
@@ -86,7 +86,7 @@ npm start
 
 **UMD (Script tag - works everywhere):**
 ```html
-<script src="path/to/admin-ui-widget.umd.js"></script>
+<script src="path/to/context-management-widget.umd.js"></script>
 ```
 
 **ESM (Modern bundlers):**
@@ -106,7 +106,7 @@ import '@common/context-management-widget'
 ### Events
 
 ```javascript
-const widget = document.querySelector('admin-ui-widget');
+const widget = document.querySelector('context-management-widget');
 
 widget.addEventListener('ready', (e) => {
   console.log('Widget initialized');
@@ -163,7 +163,7 @@ Add type declarations:
 declare global {
   namespace JSX {
     interface IntrinsicElements {
-      'admin-ui-widget': React.DetailedHTMLProps<
+      'context-management-widget': React.DetailedHTMLProps<
         React.HTMLAttributes<HTMLElement> & {
           'api-base-url'?: string
           'tenant-id'?: string
@@ -182,10 +182,10 @@ declare global {
 Use attribute binding syntax:
 ```html
 <!-- Wrong -->
-<admin-ui-widget [api-base-url]="url"></admin-ui-widget>
+<context-management-widget [api-base-url]="url"></context-management-widget>
 
 <!-- Correct -->
-<admin-ui-widget [attr.api-base-url]="url"></admin-ui-widget>
+<context-management-widget [attr.api-base-url]="url"></context-management-widget>
 ```
 
 And add `CUSTOM_ELEMENTS_SCHEMA` to your component or module.

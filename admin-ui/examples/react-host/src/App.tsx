@@ -11,7 +11,7 @@ declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace JSX {
     interface IntrinsicElements {
-      'admin-ui-widget': React.DetailedHTMLProps<
+      'context-management-widget': React.DetailedHTMLProps<
         React.HTMLAttributes<HTMLElement> & {
           'api-base-url'?: string
           'tenant-id'?: string
@@ -44,7 +44,7 @@ function App() {
   }, [])
 
   return (
-    <admin-ui-widget
+    <context-management-widget
       ref={widgetRef}
       api-base-url="http://localhost:8000"
       tenant-id="demo-tenant"

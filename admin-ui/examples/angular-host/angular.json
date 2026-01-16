@@ -22,7 +22,7 @@
               {
                 "glob": "**/*",
                 "input": "../../dist-wc",
-                "output": "/admin-ui-widget"
+                "output": "/context-management-widget"
               }
             ],
             "styles": ["src/styles.css"],

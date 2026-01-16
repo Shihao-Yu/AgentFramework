@@ -118,8 +118,8 @@ class AdminUIWidget extends HTMLElement {
   }
 }
 
-if (!customElements.get('admin-ui-widget')) {
-  customElements.define('admin-ui-widget', AdminUIWidget)
+if (!customElements.get('context-management-widget')) {
+  customElements.define('context-management-widget', AdminUIWidget)
 }
 
 export { AdminUIWidget }

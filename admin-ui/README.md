@@ -42,15 +42,15 @@ npm install @common/context-management-widget
 
 ```html
 <!-- Include the script -->
-<script type="module" src="path/to/admin-ui-widget.es.js"></script>
+<script type="module" src="path/to/context-management-widget.es.js"></script>
 
 <!-- Use the component -->
-<admin-ui-widget
+<context-management-widget
   api-base-url="https://api.example.com"
   tenant-id="your-tenant"
   initial-route="/"
   theme="system"
-></admin-ui-widget>
+></context-management-widget>
 ```
 
 ### Attributes
@@ -92,11 +92,11 @@ export class AppModule {}
 // component.ts
 @Component({
   template: `
-    <admin-ui-widget
+    <context-management-widget
       api-base-url="https://api.example.com"
       tenant-id="my-tenant"
       (faq-created)="onFaqCreated($event)"
-    ></admin-ui-widget>
+    ></context-management-widget>
   `
 })
 export class AdminComponent {
@@ -128,7 +128,7 @@ function AdminPage() {
   }, []);
   
   return (
-    <admin-ui-widget
+    <context-management-widget
       ref={widgetRef}
       api-base-url="https://api.example.com"
       tenant-id="my-tenant"
@@ -140,7 +140,7 @@ function AdminPage() {
 ### Methods
 
 ```javascript
-const widget = document.querySelector('admin-ui-widget');
+const widget = document.querySelector('context-management-widget');
 
 // Navigate to a specific route
 widget.navigate('/graph');

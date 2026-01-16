@@ -2,13 +2,13 @@
   "name": "@common/context-management-widget",
   "version": "1.0.0",
   "type": "module",
-  "main": "./dist-wc/admin-ui-widget.es.js",
-  "module": "./dist-wc/admin-ui-widget.es.js",
+  "main": "./dist-wc/context-management-widget.es.js",
+  "module": "./dist-wc/context-management-widget.es.js",
   "types": "./dist-wc/types/web-component.d.ts",
   "exports": {
     ".": {
       "types": "./dist-wc/types/web-component.d.ts",
-      "import": "./dist-wc/admin-ui-widget.es.js"
+      "import": "./dist-wc/context-management-widget.es.js"
     }
   },
   "files": [

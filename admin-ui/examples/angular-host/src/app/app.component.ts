@@ -61,13 +61,13 @@ interface AdminUIWidgetElement extends HTMLElement {
       </div>
 
       <div class="widget-container">
-        <admin-ui-widget
+        <context-management-widget
           #adminWidget
           [attr.api-base-url]="apiUrl"
           [attr.tenant-id]="tenantId"
           [attr.initial-route]="currentRoute"
           [attr.theme]="theme"
-        ></admin-ui-widget>
+        ></context-management-widget>
       </div>
 
       <div class="events-panel">
@@ -163,7 +163,7 @@ interface AdminUIWidgetElement extends HTMLElement {
         min-height: 600px;
       }
 
-      admin-ui-widget {
+      context-management-widget {
         display: block;
         width: 100%;
         height: 100%;

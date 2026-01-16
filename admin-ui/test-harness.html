@@ -94,7 +94,7 @@
       min-height: 600px;
     }
     
-    admin-ui-widget {
+    context-management-widget {
       display: block;
       width: 100%;
       height: 100%;
@@ -187,13 +187,13 @@
     </div>
     
     <div class="widget-container">
-      <admin-ui-widget
+      <context-management-widget
         id="widget"
         api-base-url="http://localhost:8000"
         tenant-id="purchasing"
         initial-route="/"
         theme="system"
-      ></admin-ui-widget>
+      ></context-management-widget>
     </div>
     
     <div class="events-log">
@@ -204,7 +204,7 @@
     </div>
   </div>
 
-  <script type="module" src="./dist-wc/admin-ui-widget.es.js"></script>
+  <script type="module" src="./dist-wc/context-management-widget.es.js"></script>
   <script>
     const widget = document.getElementById('widget');
     const eventsList = document.getElementById('eventsList');

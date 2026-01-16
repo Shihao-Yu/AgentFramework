@@ -61,7 +61,7 @@
       height: calc(100vh - 56px);
     }
 
-    admin-ui-widget {
+    context-management-widget {
       display: block;
       width: 100%;
       height: 100%;
@@ -114,13 +114,13 @@
   </header>
 
   <div class="widget-wrapper">
-    <admin-ui-widget
+    <context-management-widget
       id="adminWidget"
       api-base-url="http://localhost:8000"
       tenant-id="demo-tenant"
       initial-route="/"
       theme="system"
-    ></admin-ui-widget>
+    ></context-management-widget>
   </div>
 
   <div id="toast" class="toast">
@@ -128,7 +128,7 @@
     <div class="toast-message"></div>
   </div>
 
-  <script src="../../dist-wc/admin-ui-widget.umd.js"></script>
+  <script src="../../dist-wc/context-management-widget.umd.js"></script>
   <script>
     const widget = document.getElementById('adminWidget');
     const toast = document.getElementById('toast');
