@@ -1,8 +1,5 @@
 """Auth providers."""
 
-from contextforge.providers.auth.header import HeaderAuthProvider
-from contextforge.providers.auth.noop import NoopAuthProvider
-
 
 def __getattr__(name: str):
     lazy_imports = {
@@ -19,8 +16,6 @@ def __getattr__(name: str):
 
 
 __all__ = [
-    "HeaderAuthProvider",
-    "NoopAuthProvider",
     "JWTAuthProvider",
     "JWKSAuthProvider",
     "JWTValidationResult",

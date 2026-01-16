@@ -345,18 +345,13 @@ def _get_jwks_auth_provider():
 
 async def get_current_user(
     authorization: Optional[str] = Header(None, alias="Authorization"),
-    x_user_id: Optional[str] = Header(None, alias="X-User-ID"),
-    x_tenant_ids: Optional[str] = Header(None, alias="X-Tenant-IDs"),
 ) -> dict:
     """
-    Dependency for getting current user context.
+    Dependency for getting current user context via JWT token.
     
-    Authentication modes (configured via AUTH_MODE env var):
-    - "none": No authentication (development only)
-    - "header": Trust headers from API gateway (X-User-ID, X-Tenant-IDs)
-    - "jwks": Validate JWT token via JWKS endpoint (Azure AD / ADFS)
+    Validates JWT token via JWKS endpoint (Azure AD / ADFS).
     
-    For jwks mode, set these environment variables:
+    Required environment variables:
     - AUTH_JWKS_URL: JWKS endpoint URL
     - AUTH_ISSUER: Expected token issuer
     - AUTH_AUDIENCE: Expected token audience (optional)
@@ -366,48 +361,28 @@ async def get_current_user(
     Returns:
         dict with email, tenant_ids, and is_authenticated flag
     """
-    auth_mode = os.environ.get("AUTH_MODE", "none")
-    
     user_context = {
         "email": "anonymous@local",
         "tenant_ids": ["default", "shared"],
         "is_authenticated": False,
     }
     
-    if auth_mode == "none":
-        user_context["email"] = x_user_id or "dev-user@local"
-        user_context["is_authenticated"] = True
-        if x_tenant_ids:
-            user_context["tenant_ids"] = [t.strip() for t in x_tenant_ids.split(",")]
+    if not authorization or not authorization.startswith("Bearer "):
         return user_context
     
-    if auth_mode == "header":
-        if x_user_id:
-            user_context["email"] = x_user_id
-            user_context["is_authenticated"] = True
-            if x_tenant_ids:
-                user_context["tenant_ids"] = [t.strip() for t in x_tenant_ids.split(",")]
-            else:
-                user_context["tenant_ids"] = ["default", "shared"]
-        return user_context
-    
-    if auth_mode == "jwks":
-        if not authorization or not authorization.startswith("Bearer "):
-            return user_context
+    try:
+        provider = _get_jwks_auth_provider()
+        token = authorization[7:]
+        result = await provider.validate_token(token)
         
-        try:
-            provider = _get_jwks_auth_provider()
-            token = authorization[7:]
-            result = await provider.validate_token(token)
-            
-            user_context["email"] = result.email
-            user_context["display_name"] = result.display_name
-            user_context["tenant_ids"] = list(result.groups) if result.groups else ["default"]
-            user_context["roles"] = list(result.roles)
-            user_context["is_authenticated"] = True
-            
-        except Exception as e:
-            logger.warning(f"JWKS token validation failed: {e}")
+        user_context["email"] = result.email
+        user_context["display_name"] = result.display_name
+        user_context["tenant_ids"] = list(result.groups) if result.groups else ["default"]
+        user_context["roles"] = list(result.roles)
+        user_context["is_authenticated"] = True
+        
+    except Exception as e:
+        logger.warning(f"JWKS token validation failed: {e}")
     
     return user_context
 

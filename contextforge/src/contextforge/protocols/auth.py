@@ -46,23 +46,7 @@ class AuthProvider(Protocol):
     """
     Protocol for authentication providers.
     
-    Implement this to integrate with your auth system
-    (JWT, OAuth, API keys, custom, etc.)
-    
-    Example - Header-based auth:
-        class HeaderAuthProvider(AuthProvider):
-            async def get_current_user(self, request: Request) -> AuthContext:
-                email = request.headers.get("X-User-Email", "anonymous@local")
-                tenant_id = request.headers.get("X-Tenant-ID", "default")
-                return AuthContext(
-                    email=email,
-                    tenant_ids=[tenant_id],
-                )
-            
-            async def check_tenant_access(
-                self, user: AuthContext, tenant_id: str
-            ) -> bool:
-                return user.can_access_tenant(tenant_id)
+    Implement this to integrate with your auth system (JWT, JWKS, OAuth, etc.)
     
     Example - JWT auth:
         class JWTAuthProvider(AuthProvider):

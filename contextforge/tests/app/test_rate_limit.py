@@ -334,55 +334,6 @@ class TestRateLimitInfo:
         assert info.retry_after is None
 
 
-class TestRateLimitByUser:
-    """Test rate limiting per user."""
-
-    @pytest.fixture
-    def app(self):
-        """Create test app."""
-        app = FastAPI()
-        
-        @app.get("/user-limited")
-        async def user_limited_endpoint(
-            _: None = Depends(rate_limit_dependency(limit=2, window=60)),
-        ):
-            return {"status": "ok"}
-        
-        return app
-
-    @pytest.fixture
-    def client(self, app):
-        """Create test client."""
-        return TestClient(app)
-
-    def test_different_users_have_separate_limits(self, client):
-        """Different users should have separate rate limits."""
-        with patch('app.core.config.settings') as mock_settings:
-            mock_settings.RATE_LIMIT_ENABLED = True
-            
-            # User A uses their limit
-            for _ in range(2):
-                response = client.get(
-                    "/user-limited",
-                    headers={"X-User-ID": "user-a"}
-                )
-                assert response.status_code == 200
-            
-            # User A is now limited
-            response = client.get(
-                "/user-limited",
-                headers={"X-User-ID": "user-a"}
-            )
-            assert response.status_code == 429
-            
-            # User B should still have their full limit
-            response = client.get(
-                "/user-limited",
-                headers={"X-User-ID": "user-b"}
-            )
-            assert response.status_code == 200
-
-
 class TestRateLimitErrorResponse:
     """Test rate limit error response format."""
 
