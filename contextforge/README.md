@@ -47,10 +47,10 @@ cp .env.example .env
 4. Set up database:
 ```bash
 # Create database
-createdb faq_knowledge_base
+createdb knowledge_base
 
 # Enable pgvector extension (as superuser)
-psql -d faq_knowledge_base -c "CREATE EXTENSION IF NOT EXISTS vector;"
+psql -d knowledge_base -c "CREATE EXTENSION IF NOT EXISTS vector;"
 
 # Run migrations
 alembic upgrade head

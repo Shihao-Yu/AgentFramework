@@ -1,8 +1,8 @@
 .PHONY: help setup dev api ui seed migrate clean install-api install-ui db-install db-setup db-start db-stop db-status
 
 # Default database configuration (override with environment variables)
-FRAMEWORK_DB_URL ?= postgresql://postgres:password@localhost:5432/faq_knowledge_base
-DB_NAME ?= faq_knowledge_base
+FRAMEWORK_DB_URL ?= postgresql://postgres:password@localhost:5432/knowledge_base
+DB_NAME ?= knowledge_base
 DB_USER ?= postgres
 DB_PASS ?= password
 

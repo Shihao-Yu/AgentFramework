@@ -36,10 +36,10 @@ pip install -e ".[dev]"
 
 ```bash
 # Create database
-createdb faq_knowledge_base
+createdb knowledge_base
 
 # Enable pgvector extension (requires superuser privileges)
-psql -d faq_knowledge_base -c "CREATE EXTENSION IF NOT EXISTS vector;"
+psql -d knowledge_base -c "CREATE EXTENSION IF NOT EXISTS vector;"
 ```
 
 ### 4. Configure Environment
@@ -52,7 +52,7 @@ cp .env.example .env
 Edit `.env` with your database credentials:
 
 ```bash
-FRAMEWORK_DB_URL=postgresql+asyncpg://postgres:password@localhost:5432/faq_knowledge_base
+FRAMEWORK_DB_URL=postgresql+asyncpg://postgres:password@localhost:5432/knowledge_base
 ```
 
 ### 5. Run Database Migrations
@@ -479,7 +479,7 @@ Verify your `FRAMEWORK_DB_URL` in `.env`:
 
 ```bash
 # Test connection
-psql postgresql://postgres:password@localhost:5432/faq_knowledge_base
+psql postgresql://postgres:password@localhost:5432/knowledge_base
 ```
 
 ### pgvector Extension Not Found
@@ -494,7 +494,7 @@ sudo apt install postgresql-15-pgvector
 brew install pgvector
 
 # Enable in database
-psql -d faq_knowledge_base -c "CREATE EXTENSION IF NOT EXISTS vector;"
+psql -d knowledge_base -c "CREATE EXTENSION IF NOT EXISTS vector;"
 ```
 
 ### Unknown Source Type Error
@@ -539,7 +539,7 @@ from app.clients.inference_client import InferenceClient
 async def main():
     # Set up database connection
     engine = create_async_engine(
-        "postgresql+asyncpg://postgres:password@localhost:5432/faq_knowledge_base"
+        "postgresql+asyncpg://postgres:password@localhost:5432/knowledge_base"
     )
     async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     

@@ -1,5 +1,5 @@
 -- Seed demo data for Purchase Order Knowledge Graph
--- Run with: docker exec -i faq-postgres psql -U postgres -d faq_knowledge_base < scripts/seed_po_demo.sql
+-- Run with: docker exec -i faq-postgres psql -U postgres -d knowledge_base < scripts/seed_po_demo.sql
 --
 -- This creates a rich knowledge graph demonstrating:
 -- - Entities: PurchaseOrder, PurchaseOrderLine, PurchaseOrderLineDelivery (Schedule)

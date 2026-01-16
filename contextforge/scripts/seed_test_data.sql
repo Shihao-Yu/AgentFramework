@@ -1,5 +1,5 @@
 -- Seed test data for FAQ Knowledge Base
--- Run with: docker exec -i faq-postgres psql -U postgres -d faq_knowledge_base < scripts/seed_test_data.sql
+-- Run with: docker exec -i faq-postgres psql -U postgres -d knowledge_base < scripts/seed_test_data.sql
 
 -- Clear existing data (optional, comment out if you want to append)
 TRUNCATE agent.knowledge_edges CASCADE;

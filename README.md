@@ -116,8 +116,8 @@ brew install postgresql@15 pgvector
 brew services start postgresql@15
 
 # Create database
-createdb faq_knowledge_base
-psql -d faq_knowledge_base -c "CREATE EXTENSION IF NOT EXISTS vector;"
+createdb knowledge_base
+psql -d knowledge_base -c "CREATE EXTENSION IF NOT EXISTS vector;"
 ```
 
 ## Test Data

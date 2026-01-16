@@ -42,8 +42,8 @@ source venv/bin/activate  # Linux/Mac
 pip install -e ".[dev]"
 
 # 4. Set up database
-createdb faq_knowledge_base
-psql -d faq_knowledge_base -c "CREATE EXTENSION IF NOT EXISTS vector;"
+createdb knowledge_base
+psql -d knowledge_base -c "CREATE EXTENSION IF NOT EXISTS vector;"
 
 # 5. Configure environment
 cp .env.example .env
@@ -651,8 +651,8 @@ contextforge/
 
 2. **Database Setup**
    ```bash
-   createdb faq_knowledge_base
-   psql -d faq_knowledge_base -c "CREATE EXTENSION IF NOT EXISTS vector;"
+   createdb knowledge_base
+   psql -d knowledge_base -c "CREATE EXTENSION IF NOT EXISTS vector;"
    alembic upgrade head
    ```
 

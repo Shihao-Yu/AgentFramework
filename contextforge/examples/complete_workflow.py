@@ -155,7 +155,7 @@ async def run_workflow(framework_db_url: Optional[str] = None) -> None:
     # Database setup
     db_url = framework_db_url or os.getenv(
         "FRAMEWORK_DB_URL",
-        "postgresql+asyncpg://postgres:postgres@localhost:5432/faq_knowledge_base"
+        "postgresql+asyncpg://postgres:postgres@localhost:5432/knowledge_base"
     )
     
     print("=" * 60)
