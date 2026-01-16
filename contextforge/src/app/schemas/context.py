@@ -14,7 +14,7 @@ class ContextRequest(BaseModel):
     Request schema for context retrieval from the knowledge graph.
     
     Supports filtering by node types, tags, search method tuning,
-    graph expansion control, and token budget management.
+    and graph expansion control.
     """
     query: str = Field(default="")
     tenant_ids: List[str] = Field(default_factory=list)
@@ -63,16 +63,6 @@ class ContextRequest(BaseModel):
     include_entities: bool = True
     include_schemas: bool = False
     include_examples: bool = False
-    max_tokens: Optional[int] = Field(
-        default=None,
-        ge=100,
-        le=128000,
-        description="Maximum tokens for context (None = no limit)",
-    )
-    token_model: str = Field(
-        default="gpt-4",
-        description="Model to use for token counting",
-    )
 
 
 class EntryPointResult(BaseModel):
@@ -112,8 +102,6 @@ class ContextStats(BaseModel):
     max_depth_reached: int
     entry_points_found: int
     context_nodes_found: int
-    total_tokens: Optional[int] = None
-    tokens_used: Optional[Dict[str, int]] = None  # Breakdown by category
 
 
 class ContextResponse(BaseModel):

@@ -28,8 +28,6 @@ class TestContextRequestSchema:
         assert request.include_entities is True
         assert request.include_schemas is False
         assert request.include_examples is False
-        assert request.max_tokens is None
-        assert request.token_model == "gpt-4"
 
     def test_search_method_options(self):
         """search_method should accept hybrid, bm25, or vector."""
@@ -132,13 +130,11 @@ class TestContextRequestSchema:
             tenant_ids=["acme"],
             entry_types=[NodeType.FAQ, NodeType.PLAYBOOK],
             max_depth=1,
-            max_tokens=3000,
             include_schemas=False,
             include_examples=False,
         )
         
         assert request.max_depth == 1
-        assert request.max_tokens == 3000
         assert NodeType.FAQ in request.entry_types
         assert NodeType.PLAYBOOK in request.entry_types
 

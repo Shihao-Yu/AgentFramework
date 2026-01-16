@@ -474,8 +474,6 @@ class ContextForge:
         bm25_weight: float = 0.4,
         vector_weight: float = 0.6,
         min_score: Optional[float] = None,
-        max_tokens: Optional[int] = None,
-        token_model: str = "gpt-4",
         expansion_types: Optional[List["NodeType"]] = None,
         *,
         request: Optional["ContextRequest"] = None,
@@ -506,8 +504,6 @@ class ContextForge:
                 bm25_weight=bm25_weight,
                 vector_weight=vector_weight,
                 min_score=min_score,
-                max_tokens=max_tokens,
-                token_model=token_model,
                 expansion_types=expansion_types,
             )
         

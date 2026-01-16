@@ -5,7 +5,6 @@ Provides the primary API for AI agents to retrieve relevant knowledge
 from the Knowledge Verse graph.
 """
 
-import json
 from typing import List, Optional, Dict, Any, Set, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
@@ -22,7 +21,6 @@ from app.schemas.context import (
 from app.services.node_service import NodeService
 from app.services.graph_service import GraphService
 from app.clients.embedding_client import EmbeddingClient
-from app.utils.tokens import TokenCounter
 from app.utils.schema import sql as schema_sql
 
 
@@ -36,7 +34,6 @@ class ContextService:
         self.embedding_client = embedding_client
         self.node_service = NodeService(session, embedding_client)
         self.graph_service = GraphService(session)
-        self.token_counter = TokenCounter()
     
     async def get_context(
         self,
@@ -62,28 +59,12 @@ class ContextService:
                 tenant_ids=request.tenant_ids,
             )
         
-        # Apply token budget if specified
-        tokens_used: Optional[Dict[str, int]] = None
-        total_tokens: Optional[int] = None
-        
-        if request.max_tokens:
-            entry_points, context_nodes, entities, tokens_used = self._apply_token_budget(
-                entry_points=entry_points,
-                context_nodes=context_nodes,
-                entities=entities,
-                max_tokens=request.max_tokens,
-                model=request.token_model,
-            )
-            total_tokens = sum(tokens_used.values())
-        
         stats = ContextStats(
             nodes_searched=len(entry_points) * 10,
             nodes_expanded=nodes_expanded,
             max_depth_reached=max_depth_reached,
             entry_points_found=len(entry_points),
             context_nodes_found=len(context_nodes),
-            total_tokens=total_tokens,
-            tokens_used=tokens_used,
         )
         
         return ContextResponse(
@@ -92,82 +73,6 @@ class ContextService:
             entities=entities,
             stats=stats,
         )
-    
-    def _apply_token_budget(
-        self,
-        entry_points: List[EntryPointResult],
-        context_nodes: List[ContextNodeResult],
-        entities: List[EntityResult],
-        max_tokens: int,
-        model: str = "gpt-4",
-    ) -> Tuple[List[EntryPointResult], List[ContextNodeResult], List[EntityResult], Dict[str, int]]:
-        """
-        Apply token budget to context results.
-        
-        Budget allocation:
-        - Entry points: 60% of budget
-        - Context nodes: 30% of budget
-        - Entities: 10% of budget
-        
-        Returns filtered lists and token counts by category.
-        """
-        entry_budget = int(max_tokens * 0.60)
-        context_budget = int(max_tokens * 0.30)
-        entity_budget = int(max_tokens * 0.10)
-        
-        tokens_used = {
-            "entry_points": 0,
-            "context_nodes": 0,
-            "entities": 0,
-        }
-        
-        # Filter entry points
-        filtered_entry_points: List[EntryPointResult] = []
-        for ep in entry_points:
-            text = self._node_to_text(ep.title, ep.summary, ep.content)
-            tokens = self.token_counter.count(text, model)
-            
-            if tokens_used["entry_points"] + tokens <= entry_budget:
-                filtered_entry_points.append(ep)
-                tokens_used["entry_points"] += tokens
-            else:
-                break
-        
-        # Filter context nodes
-        filtered_context_nodes: List[ContextNodeResult] = []
-        for cn in context_nodes:
-            text = self._node_to_text(cn.title, cn.summary, cn.content)
-            tokens = self.token_counter.count(text, model)
-            
-            if tokens_used["context_nodes"] + tokens <= context_budget:
-                filtered_context_nodes.append(cn)
-                tokens_used["context_nodes"] += tokens
-            else:
-                break
-        
-        # Filter entities
-        filtered_entities: List[EntityResult] = []
-        for entity in entities:
-            text = f"{entity.title} {entity.entity_path} {' '.join(entity.related_schemas)}"
-            tokens = self.token_counter.count(text, model)
-            
-            if tokens_used["entities"] + tokens <= entity_budget:
-                filtered_entities.append(entity)
-                tokens_used["entities"] += tokens
-            else:
-                break
-        
-        return filtered_entry_points, filtered_context_nodes, filtered_entities, tokens_used
-    
-    def _node_to_text(self, title: str, summary: Optional[str], content: Dict[str, Any]) -> str:
-        """Convert node data to text for token counting."""
-        parts = [title]
-        if summary:
-            parts.append(summary)
-        if content:
-            # Serialize content to string
-            parts.append(json.dumps(content))
-        return "\n".join(parts)
     
     async def _find_entry_points(
         self,
