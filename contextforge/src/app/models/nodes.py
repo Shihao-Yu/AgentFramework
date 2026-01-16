@@ -53,7 +53,7 @@ class KnowledgeNode(AuditMixin, SQLModel, table=True):
     version: int = Field(default=1)
     graph_version: int = Field(default=0, sa_column=Column(BigInteger))
     
-    metadata_: Dict[str, Any] = Field(default={}, sa_column=Column("metadata", JSONB, nullable=False, default={}))
+    node_metadata: Dict[str, Any] = Field(default={}, sa_column=Column("metadata", JSONB, nullable=False, default={}))
     
     # Relationships
     variants: List["NodeVariant"] = Relationship(back_populates="node")
