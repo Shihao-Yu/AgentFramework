@@ -58,8 +58,8 @@ async def main():
         async def embed_batch(self, texts: list[str]) -> list[list[float]]:
             return await self._provider.embed_batch(texts)
     
-    database_url = os.getenv("DATABASE_URL", "postgresql+asyncpg://localhost/contextforge")
-    engine = create_async_engine(database_url)
+    context_db_url = os.getenv("CONTEXT_DB_URL", "postgresql+asyncpg://localhost/contextforge")
+    engine = create_async_engine(context_db_url)
     async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     
     embedding_client = MockEmbeddingClientAdapter()

@@ -55,7 +55,7 @@ python examples/<example_file>.py
 ```
 
 Environment variables required:
-- DATABASE_URL - PostgreSQL connection string
+- CONTEXT_DB_URL - PostgreSQL connection string
 - EMBEDDING_API_URL - Embedding service URL (optional, uses mock)
 - INFERENCE_API_URL - LLM service URL (optional, uses mock)
 

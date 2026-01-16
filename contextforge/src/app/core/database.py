@@ -17,7 +17,7 @@ from app.core.config import settings
 
 # Create async engine
 engine = create_async_engine(
-    settings.DATABASE_URL,
+    settings.CONTEXT_DB_URL,
     pool_size=settings.DB_POOL_SIZE,
     max_overflow=settings.DB_MAX_OVERFLOW,
     echo=settings.DEBUG,

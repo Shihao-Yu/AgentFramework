@@ -20,7 +20,7 @@ class TestContextForgeInit:
             with patch('contextforge.core.app.SentenceTransformersProvider') as mock:
                 mock.side_effect = ImportError("not installed")
                 with pytest.raises(ConfigurationError) as exc_info:
-                    ContextForge(database_url=TEST_DB_URL)
+                    ContextForge(context_db_url=TEST_DB_URL)
                 assert "embedding_provider" in str(exc_info.value)
 
     def test_init_with_custom_providers(self):
@@ -29,7 +29,7 @@ class TestContextForgeInit:
         auth = NoopAuthProvider()
         
         cf = ContextForge(
-            database_url=TEST_DB_URL,
+            context_db_url=TEST_DB_URL,
             embedding_provider=embedding,
             auth_provider=auth,
         )
@@ -40,7 +40,7 @@ class TestContextForgeInit:
     def test_init_with_config(self):
         """Should accept full config object."""
         embedding = MockEmbeddingProvider()
-        config = ContextForgeConfig(database_url=TEST_DB_URL, db_schema="custom")
+        config = ContextForgeConfig(context_db_url=TEST_DB_URL, db_schema="custom")
         
         cf = ContextForge(config=config, embedding_provider=embedding)
         
@@ -52,7 +52,7 @@ class TestContextForgeRouter:
     def test_router_property(self):
         """Should return APIRouter."""
         cf = ContextForge(
-            database_url=TEST_DB_URL,
+            context_db_url=TEST_DB_URL,
             embedding_provider=MockEmbeddingProvider(),
         )
         
@@ -62,7 +62,7 @@ class TestContextForgeRouter:
     def test_router_cached(self):
         """Router should be cached."""
         cf = ContextForge(
-            database_url=TEST_DB_URL,
+            context_db_url=TEST_DB_URL,
             embedding_provider=MockEmbeddingProvider(),
         )
         
@@ -74,7 +74,7 @@ class TestContextForgeApp:
     def test_app_property(self):
         """Should return FastAPI app."""
         cf = ContextForge(
-            database_url=TEST_DB_URL,
+            context_db_url=TEST_DB_URL,
             embedding_provider=MockEmbeddingProvider(),
         )
         
@@ -84,7 +84,7 @@ class TestContextForgeApp:
     def test_app_cached(self):
         """App should be cached."""
         cf = ContextForge(
-            database_url=TEST_DB_URL,
+            context_db_url=TEST_DB_URL,
             embedding_provider=MockEmbeddingProvider(),
         )
         
@@ -96,7 +96,7 @@ class TestContextForgeDatabase:
     def test_engine_property(self):
         """Should create async engine."""
         cf = ContextForge(
-            database_url=TEST_DB_URL,
+            context_db_url=TEST_DB_URL,
             embedding_provider=MockEmbeddingProvider(),
         )
         
@@ -106,7 +106,7 @@ class TestContextForgeDatabase:
     def test_engine_cached(self):
         """Engine should be cached."""
         cf = ContextForge(
-            database_url=TEST_DB_URL,
+            context_db_url=TEST_DB_URL,
             embedding_provider=MockEmbeddingProvider(),
         )
         
@@ -116,7 +116,7 @@ class TestContextForgeDatabase:
     async def test_dispose(self):
         """dispose() should cleanup engine."""
         cf = ContextForge(
-            database_url=TEST_DB_URL,
+            context_db_url=TEST_DB_URL,
             embedding_provider=MockEmbeddingProvider(),
         )
         
@@ -133,7 +133,7 @@ class TestContextForgeDependencies:
     def test_get_current_user_returns_depends(self):
         """get_current_user should return Depends object."""
         cf = ContextForge(
-            database_url=TEST_DB_URL,
+            context_db_url=TEST_DB_URL,
             embedding_provider=MockEmbeddingProvider(),
         )
         
@@ -143,7 +143,7 @@ class TestContextForgeDependencies:
     def test_require_tenant_access_returns_depends(self):
         """require_tenant_access should return Depends object."""
         cf = ContextForge(
-            database_url=TEST_DB_URL,
+            context_db_url=TEST_DB_URL,
             embedding_provider=MockEmbeddingProvider(),
         )
         
@@ -156,7 +156,7 @@ class TestContextForgeGetContext:
     def test_get_context_requires_query_or_request(self):
         """get_context should raise if neither query nor request provided."""
         cf = ContextForge(
-            database_url=TEST_DB_URL,
+            context_db_url=TEST_DB_URL,
             embedding_provider=MockEmbeddingProvider(),
         )
         
@@ -170,7 +170,7 @@ class TestContextForgeGetContext:
     def test_get_context_requires_tenant_ids_or_request(self):
         """get_context should raise if neither tenant_ids nor request provided."""
         cf = ContextForge(
-            database_url=TEST_DB_URL,
+            context_db_url=TEST_DB_URL,
             embedding_provider=MockEmbeddingProvider(),
         )
         
@@ -184,7 +184,7 @@ class TestContextForgeGetContext:
     def test_get_context_method_exists(self):
         """get_context method should exist on ContextForge."""
         cf = ContextForge(
-            database_url=TEST_DB_URL,
+            context_db_url=TEST_DB_URL,
             embedding_provider=MockEmbeddingProvider(),
         )
         
@@ -194,7 +194,7 @@ class TestContextForgeGetContext:
     def test_get_context_is_async(self):
         """get_context should be an async method."""
         cf = ContextForge(
-            database_url=TEST_DB_URL,
+            context_db_url=TEST_DB_URL,
             embedding_provider=MockEmbeddingProvider(),
         )
         

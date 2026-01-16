@@ -3,20 +3,20 @@
 import pytest
 
 
-TEST_DATABASE_URL = "postgresql+asyncpg://test:test@testhost:5432/testdb"
+TEST_CONTEXT_DB_URL = "postgresql+asyncpg://test:test@testhost:5432/testdb"
 
 
 @pytest.fixture
-def mock_database_url():
+def mock_context_db_url():
     """Provide a test database URL."""
-    return TEST_DATABASE_URL
+    return TEST_CONTEXT_DB_URL
 
 
 @pytest.fixture
-def basic_config(mock_database_url):
+def basic_config(mock_context_db_url):
     """Provide a basic ContextForgeConfig."""
     from contextforge import ContextForgeConfig
-    return ContextForgeConfig(database_url=mock_database_url)
+    return ContextForgeConfig(context_db_url=mock_context_db_url)
 
 
 @pytest.fixture
@@ -41,11 +41,11 @@ def noop_auth_provider():
 
 
 @pytest.fixture
-def contextforge_instance(mock_database_url, mock_embedding_provider, noop_auth_provider):
+def contextforge_instance(mock_context_db_url, mock_embedding_provider, noop_auth_provider):
     """Provide a configured ContextForge instance."""
     from contextforge import ContextForge
     return ContextForge(
-        database_url=mock_database_url,
+        context_db_url=mock_context_db_url,
         embedding_provider=mock_embedding_provider,
         auth_provider=noop_auth_provider,
     )

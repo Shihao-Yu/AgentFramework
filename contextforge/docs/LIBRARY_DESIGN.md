@@ -104,12 +104,12 @@ from contextforge.providers.embedding import SentenceTransformersProvider
 from contextforge.providers.auth import JWKSAuthProvider
 
 # Minimal setup (uses defaults)
-cf = ContextForge(database_url="postgresql+asyncpg://localhost/mydb")
+cf = ContextForge(context_db_url="postgresql+asyncpg://localhost/mydb")
 
 # Full configuration with Azure AD auth
 cf = ContextForge(
     config=ContextForgeConfig(
-        database_url="postgresql+asyncpg://localhost/mydb",
+        context_db_url="postgresql+asyncpg://localhost/mydb",
         db_schema="agent",
         search_bm25_weight=0.4,
         search_vector_weight=0.6,
@@ -143,12 +143,12 @@ class ContextForgeConfig(BaseSettings):
     """Configuration for ContextForge library.
     
     All settings can be overridden via environment variables with
-    CONTEXTFORGE_ prefix (e.g., CONTEXTFORGE_DATABASE_URL).
+    CONTEXTFORGE_ prefix (e.g., CONTEXTFORGE_CONTEXT_DB_URL).
     """
     model_config = SettingsConfigDict(env_prefix="CONTEXTFORGE_")
     
     # Database
-    database_url: str
+    context_db_url: str
     db_schema: str = "agent"
     db_pool_size: int = 10
     db_max_overflow: int = 20
@@ -309,7 +309,7 @@ from fastapi import FastAPI
 from contextforge import ContextForge
 
 app = FastAPI()
-cf = ContextForge(database_url="postgresql+asyncpg://localhost/kb")
+cf = ContextForge(context_db_url="postgresql+asyncpg://localhost/kb")
 
 # Mount everything
 app.mount("/", cf.app)
@@ -337,7 +337,7 @@ async def root():
 
 # Add ContextForge
 cf = ContextForge(
-    database_url="postgresql+asyncpg://localhost/mydb",
+    context_db_url="postgresql+asyncpg://localhost/mydb",
     config=ContextForgeConfig(db_schema="agent"),
 )
 
@@ -363,7 +363,7 @@ from contextforge.services import NodeService, SearchService
 from contextforge.protocols import AuthContext
 
 app = FastAPI()
-cf = ContextForge(database_url="postgresql+asyncpg://localhost/mydb")
+cf = ContextForge(context_db_url="postgresql+asyncpg://localhost/mydb")
 
 # Custom route using ContextForge services
 @app.get("/my-search")
@@ -445,7 +445,7 @@ class MyAuthProvider(AuthProvider):
 
 # Use custom auth provider
 cf = ContextForge(
-    database_url="postgresql+asyncpg://localhost/mydb",
+    context_db_url="postgresql+asyncpg://localhost/mydb",
     auth_provider=MyAuthProvider(my_auth_service),
 )
 ```
@@ -471,7 +471,7 @@ SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
 # Share connection with ContextForge
 cf = ContextForge(
-    database_url="postgresql+asyncpg://localhost/mydb",
+    context_db_url="postgresql+asyncpg://localhost/mydb",
     engine=engine,  # Reuse existing engine
     session_factory=SessionLocal,  # Reuse existing session factory
 )
@@ -521,7 +521,7 @@ Run migrations from Python code (useful for testing or automated deployments).
 ```python
 from contextforge import ContextForge
 
-cf = ContextForge(database_url="postgresql+asyncpg://localhost/mydb")
+cf = ContextForge(context_db_url="postgresql+asyncpg://localhost/mydb")
 
 # Run migrations on startup (dev only)
 await cf.run_migrations()
@@ -674,7 +674,7 @@ from contextforge.providers.embedding import OpenAIEmbeddingProvider
 from contextforge.providers.llm import OpenAILLMProvider
 
 cf = ContextForge(
-    database_url="postgresql+asyncpg://localhost/mydb",
+    context_db_url="postgresql+asyncpg://localhost/mydb",
     embedding_provider=OpenAIEmbeddingProvider(
         api_key="sk-...",
         model="text-embedding-3-small",  # 1536 dimensions
@@ -697,7 +697,7 @@ from contextforge.providers.embedding import MockEmbeddingProvider
 from contextforge.providers.llm import MockLLMProvider
 
 cf = ContextForge(
-    database_url="postgresql+asyncpg://localhost/test_db",
+    context_db_url="postgresql+asyncpg://localhost/test_db",
     embedding_provider=MockEmbeddingProvider(
         dimensions=384,
         seed=42,  # Deterministic embeddings
@@ -721,7 +721,7 @@ from contextforge.providers.embedding import (
 )
 
 cf = ContextForge(
-    database_url="postgresql+asyncpg://localhost/mydb",
+    context_db_url="postgresql+asyncpg://localhost/mydb",
     embedding_provider=CachedEmbeddingProvider(
         provider=OpenAIEmbeddingProvider(api_key="sk-..."),
         cache_backend="redis",
@@ -882,7 +882,7 @@ from contextforge import ContextForge
 from contextforge.exceptions import ContextForgeError
 
 app = FastAPI()
-cf = ContextForge(database_url="...")
+cf = ContextForge(context_db_url="...")
 
 @app.exception_handler(ContextForgeError)
 async def contextforge_error_handler(
@@ -919,7 +919,7 @@ async def contextforge():
     """ContextForge instance for testing."""
     cf = ContextForge(
         config=ContextForgeConfig(
-            database_url="postgresql+asyncpg://localhost/test_db",
+            context_db_url="postgresql+asyncpg://localhost/test_db",
             db_schema="test_agent",
             admin_ui_enabled=False,
         ),
@@ -1020,7 +1020,7 @@ Configure database connection pool for optimal performance.
 ```python
 cf = ContextForge(
     config=ContextForgeConfig(
-        database_url="postgresql+asyncpg://localhost/mydb",
+        context_db_url="postgresql+asyncpg://localhost/mydb",
         db_pool_size=20,        # Connections in pool
         db_max_overflow=40,     # Additional connections
         db_echo=False,          # Disable SQL logging
@@ -1101,7 +1101,7 @@ results = await search_service.bm25_search(
 # Enable SQL query logging (dev only)
 cf = ContextForge(
     config=ContextForgeConfig(
-        database_url="...",
+        context_db_url="...",
         db_echo=True,  # Log all SQL queries
     ),
 )
@@ -1199,7 +1199,7 @@ from fastapi import FastAPI
 from contextforge import ContextForge
 
 app = FastAPI()
-cf = ContextForge(database_url="...")
+cf = ContextForge(context_db_url="...")
 app.mount("/kb", cf.app)
 ```
 
@@ -1250,7 +1250,7 @@ contextforge import json --file data.json --tenant acme
 # Use environment variables for secrets
 cf = ContextForge(
     config=ContextForgeConfig(
-        database_url=os.getenv("DATABASE_URL"),
+        context_db_url=os.getenv("CONTEXT_DB_URL"),
     ),
     embedding_provider=OpenAIEmbeddingProvider(
         api_key=os.getenv("OPENAI_API_KEY"),
@@ -1261,7 +1261,7 @@ cf = ContextForge(
 from my_secrets import get_secret
 
 cf = ContextForge(
-    database_url=get_secret("database_url"),
+    context_db_url=get_secret("context_db_url"),
 )
 ```
 

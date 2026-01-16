@@ -2,9 +2,9 @@
 """
 Example: Integrating ContextForge into an existing FastAPI application.
 
-REQUIRED: Set DATABASE_URL environment variable before running.
+REQUIRED: Set CONTEXT_DB_URL environment variable before running.
 
-    export DATABASE_URL="postgresql+asyncpg://user:pass@host/db"
+    export CONTEXT_DB_URL="postgresql+asyncpg://user:pass@host/db"
     python examples/library_integration.py [basic|full|openai|jwks]
 """
 
@@ -16,13 +16,13 @@ from fastapi import FastAPI, Depends
 from pydantic import BaseModel
 
 
-def _require_database_url() -> str:
-    """Get DATABASE_URL or exit with helpful message."""
-    url = os.environ.get("DATABASE_URL")
+def _require_context_db_url() -> str:
+    """Get CONTEXT_DB_URL or exit with helpful message."""
+    url = os.environ.get("CONTEXT_DB_URL")
     if not url:
-        print("ERROR: DATABASE_URL environment variable is required.")
+        print("ERROR: CONTEXT_DB_URL environment variable is required.")
         print("\nExample:")
-        print('  export DATABASE_URL="postgresql+asyncpg://user:pass@host/db"')
+        print('  export CONTEXT_DB_URL="postgresql+asyncpg://user:pass@host/db"')
         sys.exit(1)
     return url
 
@@ -36,10 +36,10 @@ def create_basic_app() -> FastAPI:
     from contextforge import ContextForge
     from contextforge.providers.embedding import SentenceTransformersProvider
     
-    database_url = _require_database_url()
+    context_db_url = _require_context_db_url()
     
     cf = ContextForge(
-        database_url=database_url,
+        context_db_url=context_db_url,
         embedding_provider=SentenceTransformersProvider(),
     )
     
@@ -67,11 +67,11 @@ def create_full_app() -> FastAPI:
     from contextforge import ContextForge, ContextForgeConfig
     from contextforge.providers.embedding import SentenceTransformersProvider
     
-    database_url = _require_database_url()
+    context_db_url = _require_context_db_url()
     
     cf = ContextForge(
         config=ContextForgeConfig(
-            database_url=database_url,
+            context_db_url=context_db_url,
             admin_ui_enabled=True,
             admin_ui_title="My Knowledge Base",
         ),
@@ -103,14 +103,14 @@ def create_openai_app() -> FastAPI:
     from contextforge.providers.embedding import OpenAIEmbeddingProvider
     from contextforge.providers.llm import OpenAILLMProvider
     
-    database_url = _require_database_url()
+    context_db_url = _require_context_db_url()
     
     if not os.environ.get("OPENAI_API_KEY"):
         print("ERROR: OPENAI_API_KEY environment variable is required for this example.")
         sys.exit(1)
     
     cf = ContextForge(
-        config=ContextForgeConfig(database_url=database_url, enable_queryforge=True),
+        config=ContextForgeConfig(context_db_url=context_db_url, enable_queryforge=True),
         embedding_provider=OpenAIEmbeddingProvider(model="text-embedding-3-small"),
         llm_provider=OpenAILLMProvider(model="gpt-4o-mini"),
     )
@@ -136,7 +136,7 @@ def create_jwks_app() -> FastAPI:
     from contextforge.providers.embedding import SentenceTransformersProvider
     from contextforge.providers.auth import JWKSAuthProvider
     
-    database_url = _require_database_url()
+    context_db_url = _require_context_db_url()
     
     jwks_url = os.environ.get("AUTH_JWKS_URL")
     issuer = os.environ.get("AUTH_ISSUER")
@@ -151,7 +151,7 @@ def create_jwks_app() -> FastAPI:
         sys.exit(1)
     
     cf = ContextForge(
-        config=ContextForgeConfig(database_url=database_url),
+        config=ContextForgeConfig(context_db_url=context_db_url),
         embedding_provider=SentenceTransformersProvider(),
         auth_provider=JWKSAuthProvider(
             jwks_url=jwks_url,

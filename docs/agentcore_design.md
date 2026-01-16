@@ -614,7 +614,7 @@ class EnvironmentSettings(BaseAppSettings):
 | `EmbeddingSettings` | `EMBEDDING_` | base_url, default_model, max_concurrent (32) |
 | `KnowledgeSettings` | `KNOWLEDGE_` | base_url, default_limit, hybrid weights |
 | `TracingSettings` | `LANGFUSE_` | public_key, secret_key, host, enabled |
-| `SessionSettings` | `SESSION_` | database_url, pool_size, session_ttl |
+| `SessionSettings` | `SESSION_` | context_db_url, pool_size, session_ttl |
 | `RegistrySettings` | `REGISTRY_` | redis_url, heartbeat_interval, ttl |
 | `AuthSettings` | `AUTH_` | cache_ttl, default_permissions |
 | `AgentSettings` | `AGENT_` | max_iterations, max_context_tokens |
@@ -1449,7 +1449,7 @@ LANGFUSE_MAX_CONTENT_LENGTH=10000
 # =============================================================================
 # SESSION (PostgreSQL)
 # =============================================================================
-SESSION_DATABASE_URL=postgresql+asyncpg://user:pass@localhost:5432/agent_sessions
+SESSION_CONTEXT_DB_URL=postgresql+asyncpg://user:pass@localhost:5432/agent_sessions
 SESSION_POOL_SIZE=5
 SESSION_MAX_OVERFLOW=10
 SESSION_POOL_TIMEOUT=30

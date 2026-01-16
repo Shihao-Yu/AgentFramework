@@ -14,7 +14,7 @@ ContextForge is a pip-installable library that provides:
 
 - Python 3.11+
 - PostgreSQL 15+ with pgvector extension
-- `DATABASE_URL` environment variable
+- `CONTEXT_DB_URL` environment variable
 
 ## Installation
 
@@ -39,7 +39,7 @@ pip install contextforge[all]
 ### 1. Set Environment Variable
 
 ```bash
-export DATABASE_URL="postgresql+asyncpg://user:pass@host:5432/dbname"
+export CONTEXT_DB_URL="postgresql+asyncpg://user:pass@host:5432/dbname"
 ```
 
 ### 2. Initialize Database
@@ -279,7 +279,7 @@ cf = ContextForge(
 from contextforge import ContextForgeConfig
 
 config = ContextForgeConfig(
-    # Database (required via DATABASE_URL env var)
+    # Database (required via CONTEXT_DB_URL env var)
     db_schema="agent",           # PostgreSQL schema name
     db_pool_size=10,             # Connection pool size
     db_max_overflow=20,          # Max overflow connections
@@ -344,7 +344,7 @@ For framework integrations, you can use the `get_context()` method directly with
 ```python
 from contextforge import ContextForge, NodeType
 
-cf = ContextForge(database_url="postgresql+asyncpg://...")
+cf = ContextForge(context_db_url="postgresql+asyncpg://...")
 
 # Simple query
 results = await cf.get_context(
@@ -427,8 +427,8 @@ from contextforge.providers.embedding import SentenceTransformersProvider
 from contextforge.providers.auth import JWKSAuthProvider
 
 # Validate required config
-if not os.environ.get("DATABASE_URL"):
-    raise RuntimeError("DATABASE_URL environment variable is required")
+if not os.environ.get("CONTEXT_DB_URL"):
+    raise RuntimeError("CONTEXT_DB_URL environment variable is required")
 
 # Initialize ContextForge
 cf = ContextForge(
@@ -485,11 +485,11 @@ if __name__ == "__main__":
 
 ## Troubleshooting
 
-### "DATABASE_URL environment variable is required"
+### "CONTEXT_DB_URL environment variable is required"
 
 Set the environment variable:
 ```bash
-export DATABASE_URL="postgresql+asyncpg://user:pass@host:5432/db"
+export CONTEXT_DB_URL="postgresql+asyncpg://user:pass@host:5432/db"
 ```
 
 ### "No embedding provider configured"

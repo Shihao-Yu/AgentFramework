@@ -887,7 +887,7 @@ async def get_context(
 ```python
 from contextforge import ContextForge, NodeType
 
-cf = ContextForge(database_url="postgresql+asyncpg://...")
+cf = ContextForge(context_db_url="postgresql+asyncpg://...")
 
 # Simple query
 results = await cf.get_context(

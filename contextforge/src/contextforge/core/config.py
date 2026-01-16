@@ -12,8 +12,8 @@ class ContextForgeConfig(BaseSettings):
         extra="ignore",
     )
     
-    database_url: str = Field(
-        validation_alias=AliasChoices("DATABASE_URL", "database_url"),
+    context_db_url: str = Field(
+        validation_alias=AliasChoices("CONTEXT_DB_URL", "context_db_url"),
     )
     
     db_schema: str = Field(
@@ -127,11 +127,11 @@ class ContextForgeConfig(BaseSettings):
     # Validators
     # ===================
     
-    @field_validator("database_url")
+    @field_validator("context_db_url")
     @classmethod
-    def validate_database_url(cls, v: str) -> str:
+    def validate_context_db_url(cls, v: str) -> str:
         if not v.startswith("postgresql"):
-            raise ValueError("database_url must be a PostgreSQL URL")
+            raise ValueError("context_db_url must be a PostgreSQL URL")
         if "asyncpg" not in v and "+asyncpg" not in v:
             # Auto-fix sync URL to async
             v = v.replace("postgresql://", "postgresql+asyncpg://")

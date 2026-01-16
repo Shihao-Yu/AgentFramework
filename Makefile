@@ -1,7 +1,7 @@
 .PHONY: help setup dev api ui seed migrate clean install-api install-ui db-install db-setup db-start db-stop db-status
 
 # Default database configuration (override with environment variables)
-DATABASE_URL ?= postgresql://postgres:password@localhost:5432/faq_knowledge_base
+CONTEXT_DB_URL ?= postgresql://postgres:password@localhost:5432/faq_knowledge_base
 DB_NAME ?= faq_knowledge_base
 DB_USER ?= postgres
 DB_PASS ?= password
@@ -127,7 +127,7 @@ migrate:
 
 seed:
 	@echo "Seeding database with test data..."
-	cd contextforge && DATABASE_URL=$(DATABASE_URL) make seed
+	cd contextforge && CONTEXT_DB_URL=$(CONTEXT_DB_URL) make seed
 
 db-reset: migrate seed
 	@echo ""

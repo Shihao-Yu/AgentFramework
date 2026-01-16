@@ -68,11 +68,11 @@ shell:
 	$(PYTHON)
 
 db-shell:
-	psql $(DATABASE_URL)
+	psql $(CONTEXT_DB_URL)
 
 seed:
 	@echo "Seeding test data..."
-	psql $(DATABASE_URL) < scripts/seed_test_data.sql
+	psql $(CONTEXT_DB_URL) < scripts/seed_test_data.sql
 
 clean:
 	rm -rf $(VENV)

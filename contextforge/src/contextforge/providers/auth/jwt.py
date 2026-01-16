@@ -17,7 +17,7 @@ Usage:
     )
     
     cf = ContextForge(
-        database_url="...",
+        context_db_url="...",
         auth_provider=provider,
     )
 """

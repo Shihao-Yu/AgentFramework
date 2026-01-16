@@ -52,7 +52,7 @@ cp .env.example .env
 Edit `.env` with your database credentials:
 
 ```bash
-DATABASE_URL=postgresql+asyncpg://postgres:password@localhost:5432/faq_knowledge_base
+CONTEXT_DB_URL=postgresql+asyncpg://postgres:password@localhost:5432/faq_knowledge_base
 ```
 
 ### 5. Run Database Migrations
@@ -475,7 +475,7 @@ pip install -e .
 
 ### Database Connection Error
 
-Verify your `DATABASE_URL` in `.env`:
+Verify your `CONTEXT_DB_URL` in `.env`:
 
 ```bash
 # Test connection

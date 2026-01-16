@@ -19,7 +19,7 @@ Usage:
     python examples/complete_workflow.py
 
 Environment Variables:
-    DATABASE_URL: PostgreSQL connection string (asyncpg driver)
+    CONTEXT_DB_URL: PostgreSQL connection string (asyncpg driver)
                   Example: postgresql+asyncpg://user:pass@localhost:5432/contextforge
 """
 
@@ -124,13 +124,13 @@ def print_result(result: dict, indent: int = 0) -> None:
 # Main Workflow
 # -----------------------------------------------------------------------------
 
-async def run_workflow(database_url: Optional[str] = None) -> None:
+async def run_workflow(context_db_url: Optional[str] = None) -> None:
     """
     Run the complete ContextForge workflow demonstration.
     
     Args:
-        database_url: Optional database URL override. If not provided,
-                      uses DATABASE_URL environment variable.
+        context_db_url: Optional database URL override. If not provided,
+                      uses CONTEXT_DB_URL environment variable.
     """
     # Import after path setup
     from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
@@ -153,8 +153,8 @@ async def run_workflow(database_url: Optional[str] = None) -> None:
             return await self._provider.embed_batch(texts)
     
     # Database setup
-    db_url = database_url or os.getenv(
-        "DATABASE_URL",
+    db_url = context_db_url or os.getenv(
+        "CONTEXT_DB_URL",
         "postgresql+asyncpg://postgres:postgres@localhost:5432/faq_knowledge_base"
     )
     

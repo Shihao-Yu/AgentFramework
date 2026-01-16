@@ -43,7 +43,7 @@ class ContextForge:
     Basic Usage:
         from contextforge import ContextForge
         
-        cf = ContextForge(database_url="postgresql+asyncpg://...")
+        cf = ContextForge(context_db_url="postgresql+asyncpg://...")
         app.include_router(cf.router, prefix="/api/kb")
     
     Full Configuration:
@@ -52,7 +52,7 @@ class ContextForge:
         
         cf = ContextForge(
             config=ContextForgeConfig(
-                database_url="postgresql+asyncpg://...",
+                context_db_url="postgresql+asyncpg://...",
                 db_schema="knowledge",
                 admin_ui_enabled=True,
             ),
@@ -78,7 +78,7 @@ class ContextForge:
     
     def __init__(
         self,
-        database_url: Optional[str] = None,
+        context_db_url: Optional[str] = None,
         config: Optional[ContextForgeConfig] = None,
         embedding_provider: Optional[EmbeddingProvider] = None,
         llm_provider: Optional[LLMProvider] = None,
@@ -89,7 +89,7 @@ class ContextForge:
         Initialize ContextForge.
         
         Args:
-            database_url: PostgreSQL connection URL (shortcut for config)
+            context_db_url: PostgreSQL connection URL (shortcut for config)
             config: Full configuration object
             embedding_provider: Custom embedding provider (default: SentenceTransformers)
             llm_provider: Custom LLM provider (optional, for query generation)
@@ -99,8 +99,8 @@ class ContextForge:
         # Configuration
         if config is not None:
             self.config = config
-        elif database_url is not None:
-            self.config = ContextForgeConfig(database_url=database_url)
+        elif context_db_url is not None:
+            self.config = ContextForgeConfig(context_db_url=context_db_url)
         else:
             # Try to load from environment
             self.config = ContextForgeConfig()
@@ -142,7 +142,7 @@ class ContextForge:
         """Get or create database engine."""
         if self._engine is None:
             self._engine = create_async_engine(
-                self.config.database_url,
+                self.config.context_db_url,
                 pool_size=self.config.db_pool_size,
                 max_overflow=self.config.db_max_overflow,
                 echo=self.config.db_echo,

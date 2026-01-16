@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     API_PREFIX: str = "/api"
     
     # Database
-    DATABASE_URL: str = "postgresql+asyncpg://user:password@localhost:5432/knowledge_db"
+    CONTEXT_DB_URL: str = "postgresql+asyncpg://user:password@localhost:5432/knowledge_db"
     DB_POOL_SIZE: int = 10
     DB_MAX_OVERFLOW: int = 20
     DB_SCHEMA: str = "agent"
